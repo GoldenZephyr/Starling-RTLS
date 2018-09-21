@@ -7,7 +7,6 @@
 #include <stdlib.h>
 #include "mac_comms.h"
 #include "spi_comms.h"
-#define BUF_LEN 6
 
 int main() {
   struct spi_bus bus0;
@@ -17,17 +16,25 @@ int main() {
   bus0.xfer = &xfer0;
   if (spi_init(&bus0) != 0)
     exit(EXIT_FAILURE);
-  
-  
-  char rx_buf[BUF_LEN] = {0x00};
-  char tx_buf[BUF_LEN] = {0x06, 0x00, 0x00, 0x00, 0x00};
-
-  //Open file Descriptor
-  //Send Message
-  write_spi_msg(&bus0, rx_buf, tx_buf, BUF_LEN);
-  printf("0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n",
-    rx_buf[1], rx_buf[2], rx_buf[3], rx_buf[4], rx_buf[5]); 
+  //Check for proper SPI setup
+  if (comms_check(&bus0) == 0) {
+    printf("SPI Error: Cannot read device ID\n");
+    exit(EXIT_FAILURE);
+  }
+  //Initialize Comms
+  decawave_comms_init(&bus0, 0xAAAA, 0xBBBB, NULL);
   return 0;
+}
+
+//Checks that we can read the device ID
+//Returns 1 if we can, 0 if we cannot
+int comms_check(struct spi_bus * const bus) {
+  char rx_buf[DEV_ID_LEN] = {0x00};
+  char tx_buf[DEV_ID_LEN] = {0x00};
+  write_spi_msg(bus, rx_buf, tx_buf, DEV_ID_LEN);
+  return (rx_buf[1] == 0x30 && rx_buf[2] == 0x01 
+           && rx_buf[3] == 0xCA && rx_buf[4] == 0xDE);
+
 }
 
 int spi_init(struct spi_bus *bus) {
@@ -55,15 +62,23 @@ int write_spi_msg(
 int decawave_comms_init(struct spi_bus * const bus, const uint16_t pan_id,
   const uint16_t addr_id, const struct tx_fctrl *fctrl) {
   //Write the PAN ID and Addr ID
-  char tx_buf[PANADDR_LEN] = {PANADDR_REG | WRITE,
-                              (uint8_t) pan_id, (uint8_t) pan_id >> 8,
-                              (uint8_t) addr_id, (uint8_t) addr_id >> 8};
+  struct panaddr pan_msg;
+  pan_msg.reg = PANADDR_REG | WRITE;
+  pan_msg.pan_id = pan_id;
+  pan_msg.addr_id = addr_id;
   char rx_buf[PANADDR_LEN] = {0x00};
-  write_spi_msg(bus, rx_buf, tx_buf, PANADDR_LEN);
+  write_spi_msg(bus, rx_buf, &pan_msg, PANADDR_LEN);
+  
+  /* Write Check | TODO: Make Unit Test 
+  char tx_buf[PANADDR_LEN] = {PANADDR_REG, 0x00, 0x00, 0x00, 0x00};
+  write_spi_msg(bus, rx_buf, tx_buf, PANADDR_LEN); 
+  printf("0x%02X 0x%02X 0x%02X 0x%02X\n",
+    rx_buf[1], rx_buf[2], rx_buf[3], rx_buf[4]); */
+
   //Write the tx_fctrl register
   char rx_buf[TX_FCTRL_LEN] = {0x00};
   write_spi_msg(bus, rx_buf, fctrl, TX_FCTRL_LEN);
-  return 0;
+ return 0;
 }
 
 

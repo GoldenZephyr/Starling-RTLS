@@ -3,6 +3,9 @@
 
 #define WRITE 0x80
 
+#define DEV_ID_REG 0x00
+#define DEV_ID_LEN 5
+
 #define SYS_TIME_REG 0x06
 #define SYS_TIME_LEN 6
 
@@ -23,7 +26,14 @@ struct spi_bus {
   struct spi_ioc_transfer *xfer;
 };
 
-struct tx_fctrl {
+struct __attribute__((__packed__)) panaddr {
+  uint8_t reg;
+  uint16_t pan_id;
+  uint16_t addr_id;
+};
+
+struct __attribute__((__packed__)) tx_fctrl {
+  uint8_t reg;
   unsigned int tflen : 7;
   unsigned int tfle : 3;
   unsigned int res_1 : 3;
@@ -37,10 +47,12 @@ struct tx_fctrl {
   unsigned int res_2 : 24;
 };
 
-int spi_init(struct spi_bus *bus);
+int spi_init(struct spi_bus * const bus);
+
+int comms_check(struct spi_bus * const bus);
 
 int decawave_comms_init(struct spi_bus * const bus, const uint16_t pan_id,
-  const uint16_t addr_id);
+  const uint16_t addr_id, const struct tx_fctrl * const fctrl);
 
 int write_spi_msg(struct spi_bus *bus,
                   char * const rx,
