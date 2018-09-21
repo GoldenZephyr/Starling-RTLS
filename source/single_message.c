@@ -19,7 +19,7 @@ int main() {
     exit(EXIT_FAILURE);
   
   
-  char rx_buf[BUF_LEN] = {0x00, 0x00, 0x00, 0x00, 0x00};
+  char rx_buf[BUF_LEN] = {0x00};
   char tx_buf[BUF_LEN] = {0x06, 0x00, 0x00, 0x00, 0x00};
 
   //Open file Descriptor
@@ -40,7 +40,7 @@ int spi_init(struct spi_bus *bus) {
 }
 
 int write_spi_msg(
-  struct spi_bus *bus, char * const rx, const char * const tx, int len) {
+  struct spi_bus *bus, char * const rx, const void * const tx, int len) {
   bus->xfer->rx_buf = (unsigned long) rx;
   bus->xfer->tx_buf = (unsigned long) tx;
   bus->xfer->len = len;
@@ -53,12 +53,16 @@ int write_spi_msg(
 }
 
 int decawave_comms_init(struct spi_bus * const bus, const uint16_t pan_id,
-  const uint16_t addr_id) {
+  const uint16_t addr_id, const struct tx_fctrl *fctrl) {
+  //Write the PAN ID and Addr ID
   char tx_buf[PANADDR_LEN] = {PANADDR_REG | WRITE,
                               (uint8_t) pan_id, (uint8_t) pan_id >> 8,
                               (uint8_t) addr_id, (uint8_t) addr_id >> 8};
-  char rx_buf[PANADDR_LEN] = {0x00, 0x00, 0x00, 0x00, 0x00};
+  char rx_buf[PANADDR_LEN] = {0x00};
   write_spi_msg(bus, rx_buf, tx_buf, PANADDR_LEN);
+  //Write the tx_fctrl register
+  char rx_buf[TX_FCTRL_LEN] = {0x00};
+  write_spi_msg(bus, rx_buf, fctrl, TX_FCTRL_LEN);
   return 0;
 }
 

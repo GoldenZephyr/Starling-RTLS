@@ -14,10 +14,27 @@
 #define ADDR_ID_LO 0x13
 #define ADDR_ID_HI 0x37
 
+#define TX_FCTRL_REG 0x08
+#define TX_FCTRL_LEN 6
+
 struct spi_bus {
   const char *interface_name;
   int spi_fd;
   struct spi_ioc_transfer *xfer;
+};
+
+struct tx_fctrl {
+  unsigned int tflen : 7;
+  unsigned int tfle : 3;
+  unsigned int res_1 : 3;
+  unsigned int txbr : 2;
+  unsigned int tr : 1;
+  unsigned int txprf : 2;
+  unsigned int txpsr : 2;
+  unsigned int pe : 2;
+  unsigned int txbodds : 10;
+  unsigned int ifsdelay : 8;
+  unsigned int res_2 : 24;
 };
 
 int spi_init(struct spi_bus *bus);
@@ -27,7 +44,7 @@ int decawave_comms_init(struct spi_bus * const bus, const uint16_t pan_id,
 
 int write_spi_msg(struct spi_bus *bus,
                   char * const rx,
-                  const char * const tx,
+                  const void * const tx,
                   int len);
 
 int write_payload(struct spi_bus *bus,
