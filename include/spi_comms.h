@@ -20,6 +20,12 @@
 #define TX_FCTRL_REG 0x08
 #define TX_FCTRL_LEN 6
 
+#define TX_BUFFER_REG 0x09
+#define TX_BUFFER_LEN 128
+
+//TODO: Standardize this
+#define PAYLOAD_LEN 114
+
 struct spi_bus {
   const char *interface_name;
   int spi_fd;
@@ -47,6 +53,36 @@ struct __attribute__((__packed__)) tx_fctrl {
   unsigned int res_2 : 24;
 };
 
+//Frame Control - 2 Bytes
+struct __attribute__((__packed__)) frame_control {
+ unsigned int frame_type : 3;
+ unsigned int security_enabled : 1;
+ unsigned int frame_pending : 1;
+ unsigned int ack_request : 1;
+ unsigned int pan_id_compress : 1;
+ unsigned int reserved : 3;
+ unsigned int dest_addr_mode : 2;
+ unsigned int frame_version : 2;
+ unsigned int source_address_mode : 2;
+};
+
+//MAC Header - 11 Bytes
+struct __attribute__((__packed__)) mac_header {
+  struct frame_control frame_control;
+  uint8_t sequence_number;
+  uint16_t dest_pan_id;
+  uint16_t dest_addr;
+  uint16_t source_pan_id;
+  uint16_t source_addr;
+};
+
+//TX Buffer - 127 Octets
+struct __attribute__((__packed__)) tx_buffer {
+  uint8_t reg;
+  struct mac_header mac_header;
+  uint8_t payload[114]; //127 - 11 - 2 = 114 Bytes
+};
+
 int spi_init(struct spi_bus * const bus);
 
 int comms_check(struct spi_bus * const bus);
@@ -64,5 +100,7 @@ int write_payload(struct spi_bus *bus,
               const char * const payload,
               const int len,
               const uint64_t timestamp);
+
+
 
 

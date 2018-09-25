@@ -13,8 +13,11 @@
 int main() {
   struct spi_bus bus0;
   const char *i_name = "/dev/spidev0.0"; 
-  struct spi_ioc_transfer xfer0; 
+  struct spi_ioc_transfer xfer0;
+
   struct tx_fctrl fctrl;
+  struct tx_buffer tx_buff;
+
   bus0.interface_name = i_name;
   bus0.xfer = &xfer0;
   if (spi_init(&bus0) != 0)
@@ -24,23 +27,47 @@ int main() {
     printf("SPI Error: Cannot read device ID\n");
     exit(EXIT_FAILURE);
   }
-  //Setup tx_fctrl TODO: Move this somewhere else
-  fctrl.reg = TX_FCTRL_REG;
-  fctrl.tflen = 0x7F; //Frame Length - 127 Bytes
-  fctrl.tfle = 0;     //Extended Frame - No
-  fctrl.res_1 = 0;    //Reserved Bits - Write 0
-  fctrl.txbr = 2;     //Transmit Bitrate - 6.8Mbps
-  fctrl.tr = 1;       //Ranging Frame - Yes (Unused)
-  fctrl.txprf = 2;    //Transmit Preamble Repitition Rate - 64Mhz
-  fctrl.txpsr = 1;
-  fctrl.pe = 1;       //Preamble Length Selection - 128 Symbols
-  fctrl.txbodds = 0;  //Transmit Buffer Offset - 0 Bytes
-  fctrl.ifsdelay = 0; //Minimum Time Between Frame Sends - 0 Symbols
-  fctrl.res_2 = 0;    //Reserved Bits - Write 0 */
-  (void) fctrl;
+
+  //Setup tx_fctrl
+  frame_control_init(&fctrl);
+  
+  //Setup tx_buffer
+
+
+
 //Initialize Comms
-  decawave_comms_init(&bus0, 0xAAAA, 0xBBBB, &fctrl);
+  printf("%d %d\n", sizeof(struct mac_header), sizeof(struct frame_control));
+  
+ // decawave_comms_init(&bus0, 0xAAAA, 0xBBBB, &fctrl);
   return 0;
+}
+
+//Initializes tx_fctrl with our parameters
+void frame_control_init(struct tx_fctrl *fctrl) {
+  fctrl->reg = TX_FCTRL_REG | WRITE;
+  fctrl->tflen    = 0x7F; //Frame Length - 127 Bytes
+  fctrl->tfle     = 0x0;  //Extended Frame - No
+  fctrl->res_1    = 0x0;  //Reserved Bits - Write 0
+  fctrl->txbr     = 0x0;  //Transmit Bitrate - 110 kbps
+  fctrl->tr       = 0x1;  //Ranging Frame - Yes (Unused)
+  fctrl->txprf    = 0x2;  //Transmit Preamble Repitition Rate - 64Mhz
+  fctrl->txpsr    = 0x3;
+  fctrl->pe       = 0x0;  //Preamble Length Selection - 4096 Symbols
+  fctrl->txbodds  = 0x0;  //Transmit Buffer Offset - 0 Bytes
+  fctrl->ifsdelay = 0x0;  //Minimum Time Between Frame Sends - 0 Symbols
+  fctrl->res_2    = 0x0;  //Reserved Bits - Write 0 */
+}
+
+void tx_buffer_init(struct tx_buffer *tx_buff) {
+   
+  tx_buff->reg = TX_BUFFER_REG;
+  //Setup Frame_Contol
+  struct frame_control *fcs = &tx_buff->mac_header.frame_control
+  fcs->frame_type = 0x01; //Frame Type - Data
+  fcs->security_enabled = 0x00; //Security Enabled - Nah man
+  fcs->frame_pending = 0x00; //More Data Incoming - No
+  fcs->ack_request = 0x00l //Request Acknowledge Message - No
+  fcs->pan_id_compress = 
 }
 
 //Checks that we can read the device ID
