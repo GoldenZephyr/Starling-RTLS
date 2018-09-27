@@ -1,4 +1,9 @@
 #include <stdint.h>
+
+struct deca_device {
+  uint16_t pan_id;
+  uint16_t addr_id;
+};
 /*
 struct frame_control {
  unsigned int frame_type : 3;

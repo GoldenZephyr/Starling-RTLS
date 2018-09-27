@@ -26,6 +26,7 @@
 //TODO: Standardize this
 #define PAYLOAD_LEN 114
 
+
 struct spi_bus {
   const char *interface_name;
   int spi_fd;
@@ -38,8 +39,9 @@ struct __attribute__((__packed__)) panaddr {
   uint16_t addr_id;
 };
 
-struct __attribute__((__packed__)) tx_fctrl {
-  uint8_t reg;
+//TX Fctrl - 9 Bytes
+struct __attribute__((packed)) tx_fctrl {
+  unsigned int reg : 8;
   unsigned int tflen : 7;
   unsigned int tfle : 3;
   unsigned int res_1 : 3;
@@ -89,6 +91,10 @@ int comms_check(struct spi_bus * const bus);
 
 int decawave_comms_init(struct spi_bus * const bus, const uint16_t pan_id,
   const uint16_t addr_id, const struct tx_fctrl * const fctrl);
+
+void frame_control_init(struct tx_fctrl *fctrl);
+
+void tx_buffer_init(struct tx_buffer *tx_buff);
 
 int write_spi_msg(struct spi_bus *bus,
                   char * const rx,
