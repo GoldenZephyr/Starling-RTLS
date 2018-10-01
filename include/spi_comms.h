@@ -23,6 +23,12 @@
 #define TX_BUFFER_REG 0x09
 #define TX_BUFFER_LEN 128
 
+#define SYS_CTRL_REG 0x0D
+#define SYS_CTRL_LEN 5
+
+#define SYS_STATUS_REG 0x0F
+#define SYS_STATUS_LEN 6
+
 //TODO: Standardize this
 #define PAYLOAD_LEN 114
 
@@ -85,6 +91,23 @@ struct __attribute__((__packed__)) tx_buffer {
   uint8_t payload[114]; //127 - 11 - 2 = 114 Bytes
 };
 
+//System Control - 4 Bytes
+struct __attribute__((__packed__)) system_control {
+  unsigned int reg : 8;
+  unsigned int sfcst : 1;
+  unsigned int txstrt : 1;
+  unsigned int txdlys : 1;
+  unsigned int cansfcs : 1;
+  unsigned int res : 2;
+  unsigned int trxoff : 1;
+  unsigned int waitresp : 1;
+  unsigned int rxenab : 1;
+  unsigned int rxdlye : 1;
+  unsigned int res_2 : 14;
+  unsigned int hrbpt : 1;
+  unsigned int res_3 : 7;
+};
+
 int spi_init(struct spi_bus * const bus);
 
 int comms_check(struct spi_bus * const bus);
@@ -95,6 +118,12 @@ int decawave_comms_init(struct spi_bus * const bus, const uint16_t pan_id,
 void frame_control_init(struct tx_fctrl *fctrl);
 
 void tx_buffer_init(struct tx_buffer *tx_buff);
+
+void sys_ctrl_init(struct system_control *ctrl);
+
+void send_message(struct spi_bus *bus, struct system_control *ctrl);
+
+void wait_for_msg(struct spi_bus *bus, struct system_control *ctrl);
 
 int write_spi_msg(struct spi_bus *bus,
                   char * const rx,

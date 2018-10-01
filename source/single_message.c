@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include "mac_comms.h"
 #include "spi_comms.h"
 
@@ -18,6 +19,7 @@ int main() {
 
   struct tx_fctrl fctrl;
   struct tx_buffer tx_buff;
+  struct system_control sys_ctrl;
 
   bus0.interface_name = i_name;
   bus0.xfer = &xfer0;
@@ -36,9 +38,6 @@ int main() {
   tx_buffer_init(&tx_buff);
 
   //Get Payload - User Input
-  printf("Type in payload (%d chars max):\n", sizeof(tx_buff.payload));
-  fgets((char *) &tx_buff.payload, sizeof(tx_buff.payload), stdin);
-  printf("%s", tx_buff.payload);
 
   //Initialize frame control / Device IDs
   const uint16_t pan_id = PAN_ID_LO | (PAN_ID_HI << 8);
@@ -46,8 +45,25 @@ int main() {
   if (decawave_comms_init(&bus0, pan_id, addr_id, &fctrl) == 1) {
     exit(EXIT_FAILURE);
   }
+ 
+  //Write in Payload
+  printf("Type in payload (%d chars max):\n", sizeof(tx_buff.payload));
+  printf("No payload for receive mode\n");
+  fgets((char *) &tx_buff.payload, sizeof(tx_buff.payload), stdin);
+  printf("%s", tx_buff.payload);
   
-  return 0;
+  
+  sys_ctrl_init(&sys_ctrl);
+  if (tx_buff.payload[0] == '\n') {
+    printf("Waiting for msg...\n");
+    wait_for_msg(&bus0, &sys_ctrl);
+  } else { //Transmit Message
+    char rx_payload_buf[TX_BUFFER_LEN] = {0x00};
+    write_spi_msg(&bus0, rx_payload_buf, &tx_buff, TX_BUFFER_LEN);
+    return 0;
+    //Transmit Message
+    send_message(&bus0, &sys_ctrl);
+  }
 }
 
 //Initializes tx_fctrl with our parameters
@@ -103,6 +119,54 @@ void tx_buffer_init(struct tx_buffer *tx_buff) {
   mac->source_addr = ADDR_ID_LO | (ADDR_ID_HI << 8);
 }
 
+
+void sys_ctrl_init(struct system_control *ctrl) {
+  ctrl->reg = SYS_CTRL_REG | WRITE;
+  ctrl->sfcst = 0; //Auto append FCS - Default No
+  ctrl->txstrt = 0; //Start Transmittion - Default No
+  ctrl->txdlys = 0; //Transmission Delay - Default No
+  ctrl->cansfcs = 0; //High Speed Transmission - Default No
+  ctrl->res = 0; //Reserved Bits - Write 0
+  ctrl->trxoff = 0; //Disable Transeiver - Default No
+  ctrl->waitresp = 0; //Enable Receiver after sending - Default No
+  ctrl->rxenab = 0; //Enable Receiver - Default No
+  ctrl->rxdlye = 0; //Receive Delay - Default No
+  ctrl->res_2 = 0; //Reserved Bits - Write 0
+  ctrl->hrbpt = 0; //Double Buffer Mode - Default 0
+  ctrl->res_3 = 0; //Reserved Bits - Write 0
+}
+
+void send_message(struct spi_bus *bus, struct system_control *ctrl) {
+  //Setup System Control to send
+  ctrl->txstrt = 0x01;
+  char rx_sys_ctrl[SYS_CTRL_LEN];
+  write_spi_msg(bus, rx_sys_ctrl, &ctrl, SYS_CTRL_LEN); //IT IS SENT
+}
+
+void wait_for_msg(struct spi_bus * bus, struct system_control *ctrl) {
+  //Turn on receiver
+  ctrl->rxenab = 0x01;
+  char rx_sys_ctrl[SYS_CTRL_LEN];
+  write_spi_msg(bus, rx_sys_ctrl, &ctrl, SYS_CTRL_LEN); //RECEIVER ON
+  //Wait for msg
+  
+  //TODO: Interrupts, for now, we will poll
+  //Poll Status Event Register
+  while(1) {
+  char tx_status[SYS_STATUS_LEN] = {0x00};
+  tx_status[0] = SYS_STATUS_REG;
+  char rx_status[SYS_STATUS_LEN] = {0x00};
+  write_spi_msg(bus, rx_status, tx_status, SYS_STATUS_LEN);
+  printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
+  rx_status[0], rx_status[1], rx_status[2], rx_status[3], rx_status[4]);
+  struct timespec t;
+  t.tv_sec = 1;
+  t.tv_nsec = 0;
+  nanosleep(&t, NULL);
+  }
+}
+
+
 //Checks that we can read the device ID
 //Returns 1 if we can, 0 if we cannot
 int comms_check(struct spi_bus * const bus) {
@@ -155,17 +219,17 @@ int decawave_comms_init(struct spi_bus * const bus, const uint16_t pan_id,
   pan_msg.pan_id = pan_id;
   pan_msg.addr_id = addr_id;
   char rx_buf[PANADDR_LEN] = {0x00};
-//  write_spi_msg(bus, rx_buf, &pan_msg, PANADDR_LEN);
+  write_spi_msg(bus, rx_buf, &pan_msg, PANADDR_LEN);
  (void) pan_msg; 
   // Write Check - Unit Test
   char tx_buf[PANADDR_LEN] = {PANADDR_REG, 0x00, 0x00, 0x00, 0x00};
-//  write_spi_msg(bus, rx_buf, tx_buf, PANADDR_LEN);
+  write_spi_msg(bus, rx_buf, tx_buf, PANADDR_LEN);
   (void) tx_buf;
   printf("0x%02X 0x%02X 0x%02X 0x%02X\n",
     rx_buf[1], rx_buf[2], rx_buf[3], rx_buf[4]);
   if ((rx_buf[1] | (rx_buf[2] << 8)) != pan_id) {
     printf("Did not set PAN_ID (reading 0x%02X 0x%02X)\n", rx_buf[1], rx_buf[2]);
-//    return 1;
+    return 1;
   }
   if ((rx_buf[3] | (rx_buf[4] << 8)) != addr_id) {
     printf("Did not set ADDR_ID (reading 0x%02X 0x%02X)\n", rx_buf[1], rx_buf[2]);
@@ -176,7 +240,7 @@ int decawave_comms_init(struct spi_bus * const bus, const uint16_t pan_id,
   //Write the tx_fctrl register
   char rx_fctrl_buf[TX_FCTRL_LEN] = {0x00};
   write_spi_msg(bus, rx_fctrl_buf, fctrl, TX_FCTRL_LEN);
-  printf("%X %d\n", fctrl->reg, sizeof(struct tx_fctrl));
+/*
   char fctrl_buf[sizeof(struct tx_fctrl)];
   memcpy(fctrl_buf, fctrl, sizeof(struct tx_fctrl));
   printf("%02X\n", fctrl->tfle);
@@ -186,9 +250,8 @@ int decawave_comms_init(struct spi_bus * const bus, const uint16_t pan_id,
     printf("%02X ", (unsigned)fctrl_buf[i]);
   }
   printf("\n");
+*/
 
-
-  //write_spi_msg(bus, rx_buf, fctrl, TX_FCTRL_LEN);
  return 0;
 }
 
@@ -203,11 +266,5 @@ int write_payload(struct spi_bus * const bus,
   (void) payload;
   (void) len;
   (void) timestamp;
-  //Write PAN and Addr IDs
-  //Writes IDs for PAN and Addr
-  
-  //Write Payload to Data Buffer
-
-
   return 0;
 }
