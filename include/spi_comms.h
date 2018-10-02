@@ -12,6 +12,9 @@
 #define PANADDR_REG 0x03
 #define PANADDR_LEN 5
 
+#define SYS_CONF_REG 0x04
+#define SYS_CONF_LEN 5
+
 #define PAN_ID_LO 0x12
 #define PAN_ID_HI 0x34
 #define ADDR_ID_LO 0x13
@@ -108,6 +111,77 @@ struct __attribute__((__packed__)) system_control {
   unsigned int res_3 : 7;
 };
 
+//System Configure - 4 Bytes
+struct __attribute__((__packed__)) system_conf {
+  unsigned int reg : 8;
+  unsigned int ffen : 1;
+  unsigned int ffbc : 1;
+  unsigned int ffab : 1;
+  unsigned int ffad : 1;
+  unsigned int ffaa : 1;
+  unsigned int ffam : 1;
+  unsigned int ffar : 1;
+  unsigned int ffaf : 1;
+  unsigned int ffav : 1;
+  unsigned int hirq : 1;
+  unsigned int spiedge : 1;
+  unsigned int disfce : 1;
+  unsigned int disdrxb : 1;
+  unsigned int disphe : 1;
+  unsigned int disrsde : 1;
+  unsigned int fcsinit : 1;
+  unsigned int phrmode : 2;
+  unsigned int disstxp : 1;
+  unsigned int res : 3;
+  unsigned int rxmk : 1;
+  unsigned int res_2 : 5;
+  unsigned int rxwtoe : 1;
+  unsigned int rxautr : 1;
+  unsigned int autoack : 1;
+  unsigned int aackpend : 1;
+};
+
+//System Status - 5 Bytes
+struct __attribute__((__packed__)) system_status {
+  unsigned int reg : 8;
+  unsigned int irqs : 1;
+  unsigned int cplock : 1;
+  unsigned int esyncr : 1;
+  unsigned int aat : 1;
+  unsigned int txfrb : 1;
+  unsigned int txprs : 1;
+  unsigned int txphs : 1;
+  unsigned int txfrs : 1;
+  unsigned int rxprd : 1;
+  unsigned int rxsfdd : 1;
+  unsigned int ldedone : 1;
+  unsigned int rxphd : 1;
+  unsigned int rxphe : 1;
+  unsigned int rxdfr : 1;
+  unsigned int rxfcg : 1;
+  unsigned int rxfce : 1;
+  unsigned int rxrfsl : 1;
+  unsigned int rxrfto : 1;
+  unsigned int ldeerr : 1;
+  unsigned int res : 1;
+  unsigned int rxovrr : 1;
+  unsigned int rxpto : 1;
+  unsigned int gpioirq : 1;
+  unsigned int slpinit : 1;
+  unsigned int rfpll : 1;
+  unsigned int clkpll : 1;
+  unsigned int rxsfdto : 1;
+  unsigned int hpdwarn : 1;
+  unsigned int txberr : 1;
+  unsigned int affrej : 1;
+  unsigned int hsrbp : 1;
+  unsigned int icrbp : 1;
+  unsigned int rxrscs : 1;
+  unsigned int rxprej : 1;
+  unsigned int txpute : 1;
+  unsigned int res_2 : 5;
+};
+
 int spi_init(struct spi_bus * const bus);
 
 int comms_check(struct spi_bus * const bus);
@@ -119,11 +193,15 @@ void frame_control_init(struct tx_fctrl *fctrl);
 
 void tx_buffer_init(struct tx_buffer *tx_buff);
 
+void sys_conf_init(struct system_conf *conf);
+
 void sys_ctrl_init(struct system_control *ctrl);
 
 void send_message(struct spi_bus *bus, struct system_control *ctrl);
 
 void wait_for_msg(struct spi_bus *bus, struct system_control *ctrl);
+
+void clear_status(struct spi_bus *bus, struct system_status *sta);
 
 int write_spi_msg(struct spi_bus *bus,
                   char * const rx,

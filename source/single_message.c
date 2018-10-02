@@ -14,11 +14,22 @@
 
 int main() {
   struct spi_bus bus0;
-  const char *i_name = "/dev/spidev0.0"; 
+  char sel[5];
+  printf("Select device (0/1):\n");
+  char i_name[20];
+  fgets(sel, sizeof(sel), stdin);
+  if (sel[0] == '0') {
+    memcpy(i_name,"/dev/spidev0.0",sizeof(i_name));
+  } else if (sel[0] == '1') { 
+    memcpy(i_name,"/dev/spidev1.0",sizeof(i_name));
+  } else {
+    return 0;
+  }
   struct spi_ioc_transfer xfer0;
 
   struct tx_fctrl fctrl;
   struct tx_buffer tx_buff;
+  struct system_conf sys_conf;
   struct system_control sys_ctrl;
 
   bus0.interface_name = i_name;
@@ -28,14 +39,28 @@ int main() {
   //Check for proper SPI setup
   if (comms_check(&bus0) == 0) {
     printf("SPI Error: Cannot read device ID\n");
-//    exit(EXIT_FAILURE);
+    exit(EXIT_FAILURE);
   }
-
+  struct system_status sta;
+  //Clear Status reg
+  clear_status(&bus0, &sta);
   //Setup tx_fctrl
   frame_control_init(&fctrl);
   
   //Setup tx_buffer
   tx_buffer_init(&tx_buff);
+
+  //Setup System Configure
+  sys_conf_init(&sys_conf);
+  char conf_rx[SYS_CONF_LEN] = {0x00};
+  write_spi_msg(&bus0, conf_rx, &sys_conf, SYS_CONF_LEN);
+  //Load Microcode
+  char otp_crtl_rx[4] = {0x00};
+  char opt_ctrl_tx[4] = {0x00};
+  otp_ctrl_tx[0] = 0x2D | 0xC0;
+  otp_ctrl_tx[1] = 0x06;
+  otp_ctrl_tx[3] = 0x80;
+  write_spi_msg(&bus0, otp_ctrl_rx, otp_ctrl_tx, 0x04);
 
   //Get Payload - User Input
 
@@ -45,14 +70,21 @@ int main() {
   if (decawave_comms_init(&bus0, pan_id, addr_id, &fctrl) == 1) {
     exit(EXIT_FAILURE);
   }
- 
+  //Confirm fctrl
+  char tx_fc[TX_FCTRL_LEN] = {0x00};
+  tx_fc[0] = TX_FCTRL_REG;
+  char rx_fc[TX_FCTRL_LEN] = {0x00};
+  write_spi_msg(&bus0, rx_fc, tx_fc, TX_FCTRL_LEN);
+  printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
+    rx_fc[1],rx_fc[2],rx_fc[3],rx_fc[4],rx_fc[5]);
+  return 0;
+
   //Write in Payload
   printf("Type in payload (%d chars max):\n", sizeof(tx_buff.payload));
   printf("No payload for receive mode\n");
   fgets((char *) &tx_buff.payload, sizeof(tx_buff.payload), stdin);
   printf("%s", tx_buff.payload);
-  
-  
+   
   sys_ctrl_init(&sys_ctrl);
   if (tx_buff.payload[0] == '\n') {
     printf("Waiting for msg...\n");
@@ -60,7 +92,6 @@ int main() {
   } else { //Transmit Message
     char rx_payload_buf[TX_BUFFER_LEN] = {0x00};
     write_spi_msg(&bus0, rx_payload_buf, &tx_buff, TX_BUFFER_LEN);
-    return 0;
     //Transmit Message
     send_message(&bus0, &sys_ctrl);
   }
@@ -72,11 +103,11 @@ void frame_control_init(struct tx_fctrl *fctrl) {
   fctrl->tflen    = 0x7F; //Frame Length - 127 Bytes
   fctrl->tfle     = 0x00;  //Extended Frame - No
   fctrl->res_1    = 0x00;  //Reserved Bits - Write 0
-  fctrl->txbr     = 0x00;  //Transmit Bitrate - 110 kbps
+  fctrl->txbr     = 0x02;  //Transmit Bitrate - 6.8Mbps
   fctrl->tr       = 0x01;  //Ranging Frame - Yes (Unused)
-  fctrl->txprf    = 0x02;  //Transmit Preamble Repitition Rate - 64Mhz
-  fctrl->txpsr    = 0x03;
-  fctrl->pe       = 0x00;  //Preamble Length Selection - 4096 Symbols
+  fctrl->txprf    = 0x01;  //Transmit Preamble Repitition Rate - 16Mhz
+  fctrl->txpsr    = 0x01;
+  fctrl->pe       = 0x01;  //Preamble Length Selection - 128 Symbols
   fctrl->txbodds  = 0x00;  //Transmit Buffer Offset - 0 Bytes
   fctrl->ifsdelay = 0x00;  //Minimum Time Between Frame Sends - 0 Symbols
   fctrl->res_2    = 0x00;  //Reserved Bits - Write 0 
@@ -136,11 +167,53 @@ void sys_ctrl_init(struct system_control *ctrl) {
   ctrl->res_3 = 0; //Reserved Bits - Write 0
 }
 
+void sys_conf_init(struct system_conf *conf) {
+  conf->reg = SYS_CONF_REG | WRITE;
+  conf->ffen = 0; //Frame filtering enable - no
+  conf->ffbc = 1; //FF as Coordinator - yes
+  conf->ffab = 1; //FF Allow Beacon - yes
+  conf->ffad = 1; //FF Allow Data - yes
+  conf->ffaa = 1; //FF Allow Ack - yes
+  conf->ffam = 1; //FF Allow MAC Command - yes
+  conf->ffar = 1; //FF Allow Reserved - yes
+  conf->ffaf = 1; //FF Allow Frames with type field 4 - Yes
+  conf->ffav = 1; //FF Allow " " " " 5 - Yes
+  conf->hirq = 1; //Use Interrupt GPIO - Yes - Active High
+  conf->spiedge = 0; //SPI Edge mode - Default
+  conf->disfce = 0; //Disable error handling - No
+  conf->disdrxb = 1; //Disable Double Buffer - Yes
+  conf->disphe = 0; //Disable on PHR error - Yes
+  conf->disrsde = 0; //Disable receiver on RSD Error - yes
+  conf->fcsinit = 0; //FCS Seed mode - Default
+  conf->phrmode = 0x00; //PHR - Standard Frame
+  conf->disstxp = 0; //Smart TX Power - Default
+  conf->res = 0; //Reserved - Write 0
+  conf->rxmk = 0; //110kbps mode - No
+  conf->res_2 = 0; //Reserved - Write 0
+  conf->rxwtoe = 0; //Timeout Receiver - No
+  conf->rxautr = 1; //Auto-reenable receive - Yes
+  conf->autoack = 0; //Auto-Ackknowledge - No
+  conf->aackpend = 0; //Auto-Append - No
+}
+
 void send_message(struct spi_bus *bus, struct system_control *ctrl) {
   //Setup System Control to send
   ctrl->txstrt = 0x01;
   char rx_sys_ctrl[SYS_CTRL_LEN];
   write_spi_msg(bus, rx_sys_ctrl, &ctrl, SYS_CTRL_LEN); //IT IS SENT
+
+while(1) {
+  char tx_status[SYS_STATUS_LEN] = {0x00};
+  tx_status[0] = SYS_STATUS_REG;
+  char rx_status[SYS_STATUS_LEN] = {0x00};
+  write_spi_msg(bus, rx_status, tx_status, SYS_STATUS_LEN);
+  printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
+  rx_status[1], rx_status[2], rx_status[3], rx_status[4], rx_status[5]);
+  struct timespec t;
+  t.tv_sec = 1;
+  t.tv_nsec = 0;
+  nanosleep(&t, NULL);
+  }
 }
 
 void wait_for_msg(struct spi_bus * bus, struct system_control *ctrl) {
@@ -151,6 +224,9 @@ void wait_for_msg(struct spi_bus * bus, struct system_control *ctrl) {
   //Wait for msg
   
   //TODO: Interrupts, for now, we will poll
+  //Clear Status Register 
+  struct system_status sta;
+  clear_status(bus, &sta);
   //Poll Status Event Register
   while(1) {
   char tx_status[SYS_STATUS_LEN] = {0x00};
@@ -158,7 +234,7 @@ void wait_for_msg(struct spi_bus * bus, struct system_control *ctrl) {
   char rx_status[SYS_STATUS_LEN] = {0x00};
   write_spi_msg(bus, rx_status, tx_status, SYS_STATUS_LEN);
   printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
-  rx_status[0], rx_status[1], rx_status[2], rx_status[3], rx_status[4]);
+  rx_status[1], rx_status[2], rx_status[3], rx_status[4], rx_status[5]);
   struct timespec t;
   t.tv_sec = 1;
   t.tv_nsec = 0;
@@ -267,4 +343,47 @@ int write_payload(struct spi_bus * const bus,
   (void) len;
   (void) timestamp;
   return 0;
+}
+
+
+void clear_status(struct spi_bus *bus, struct system_status *sta) {
+  sta->reg = SYS_STATUS_REG | WRITE;
+  sta->irqs = 0;
+  sta->cplock = 1;
+  sta->esyncr = 1;
+  sta->aat = 1;
+  sta->txfrb = 1;
+  sta->txprs = 1;
+  sta->txphs = 1;
+  sta->txfrs = 1;
+  sta->rxprd = 1;
+  sta->rxsfdd = 1;
+  sta->ldedone = 1;
+  sta->rxphd = 1;
+  sta->rxphe = 1;
+  sta->rxdfr = 1;
+  sta->rxfcg = 1;
+  sta->rxfce = 1;
+  sta->rxrfsl = 1;
+  sta->rxrfto = 1;
+  sta->ldeerr = 1;
+  sta->res = 0;
+  sta->rxovrr = 0;
+  sta->rxpto = 1;
+  sta->gpioirq = 1;
+  sta->slpinit = 0;
+  sta->rfpll = 1;
+  sta->clkpll = 1;
+  sta->rxsfdto = 1;
+  sta->hpdwarn = 0;
+  sta->txberr = 1;
+  sta->affrej = 1;
+  sta->hsrbp = 0;
+  sta->icrbp = 0;
+  sta->rxrscs = 1;
+  sta->rxprej = 1;
+  sta->txpute = 0;
+  sta->res_2 = 0;
+  char rx_buf[SYS_STATUS_LEN];
+  write_spi_msg(bus, rx_buf, sta, SYS_STATUS_LEN);
 }
