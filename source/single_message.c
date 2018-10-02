@@ -21,7 +21,7 @@ int main() {
     printf("End of file reached before input");
   } else if (sel[0] == '0') {
     memcpy(i_name,"/dev/spidev0.0",sizeof(i_name));
-  } else if (sel[0] == '1') { 
+  } else if (sel[0] == '1') {
     memcpy(i_name,"/dev/spidev1.0",sizeof(i_name));
   } else {
     return EXIT_FAILURE;
@@ -47,7 +47,7 @@ int main() {
   clear_status(&bus0, &sta);
   //Setup tx_fctrl
   frame_control_init(&fctrl);
-  
+
   //Setup tx_buffer
   tx_buffer_init(&tx_buff);
 
@@ -77,20 +77,20 @@ int main() {
   unsigned char rx_fc[TX_FCTRL_LEN] = {0x00};
   write_spi_msg(&bus0, rx_fc, tx_fc, TX_FCTRL_LEN);
   printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
-    rx_fc[1],rx_fc[2],rx_fc[3],rx_fc[4],rx_fc[5]);
+         rx_fc[1],rx_fc[2],rx_fc[3],rx_fc[4],rx_fc[5]);
   return 0;
 
   //Write in Payload
   printf("Type in payload (%lu chars max):\n", sizeof(tx_buff.payload));
   printf("No payload for receive mode\n");
   ret = fgets((char *) &tx_buff.payload, sizeof(tx_buff.payload), stdin);
-  if (ret == NULL){
+  if (ret == NULL) {
     printf("Error reading tx_buff.payload");
     exit(EXIT_FAILURE);
   } else {
     printf("%s", tx_buff.payload);
   }
-   
+
   sys_ctrl_init(&sys_ctrl);
   if (tx_buff.payload[0] == '\n') {
     printf("Waiting for msg...\n");

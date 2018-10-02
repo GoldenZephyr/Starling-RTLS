@@ -29,7 +29,7 @@ int main() {
     return 1;
   }
   printf("0x%02X 0x%02X 0x%02X 0x%02X\n",
-    rx_buf[1], rx_buf[2], rx_buf[3], rx_buf[4]); 
+         rx_buf[1], rx_buf[2], rx_buf[3], rx_buf[4]);
   return 0;
 }
 

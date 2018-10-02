@@ -20,20 +20,20 @@ void frame_control_init(struct tx_fctrl *fctrl) {
   fctrl->pe       = 0x01;  //Preamble Length Selection - 128 Symbols
   fctrl->txbodds  = 0x00;  //Transmit Buffer Offset - 0 Bytes
   fctrl->ifsdelay = 0x00;  //Minimum Time Between Frame Sends - 0 Symbols
-  fctrl->res_2    = 0x00;  //Reserved Bits - Write 0 
+  fctrl->res_2    = 0x00;  //Reserved Bits - Write 0
 
 /*  fctrl->tflen    = 0x7F; //Frame Length - 127 Bytes
-  fctrl->tfle     = 0x7;  //Extended Frame - No
-  fctrl->res_1    = 0x7;  //Reserved Bits - Write 0
-  fctrl->txbr     = 0x3;  //Transmit Bitrate - 110 kbps
-  fctrl->tr       = 0x1;  //Ranging Frame - Yes (Unused)
-  fctrl->txprf    = 0x3;  //Transmit Preamble Repitition Rate - 64Mhz
-  fctrl->txpsr    = 0x3;
-  fctrl->pe       = 0x3;  //Preamble Length Selection - 4096 Symbols
-  fctrl->txbodds  = 0x3FF;  //Transmit Buffer Offset - 0 Bytes
-  fctrl->ifsdelay = 0xFF;  //Minimum Time Between Frame Sends - 0 Symbols
-  fctrl->res_2    = 0xFFFFFF;  //Reserved Bits - Write 0
-*/
+   fctrl->tfle     = 0x7;  //Extended Frame - No
+   fctrl->res_1    = 0x7;  //Reserved Bits - Write 0
+   fctrl->txbr     = 0x3;  //Transmit Bitrate - 110 kbps
+   fctrl->tr       = 0x1;  //Ranging Frame - Yes (Unused)
+   fctrl->txprf    = 0x3;  //Transmit Preamble Repitition Rate - 64Mhz
+   fctrl->txpsr    = 0x3;
+   fctrl->pe       = 0x3;  //Preamble Length Selection - 4096 Symbols
+   fctrl->txbodds  = 0x3FF;  //Transmit Buffer Offset - 0 Bytes
+   fctrl->ifsdelay = 0xFF;  //Minimum Time Between Frame Sends - 0 Symbols
+   fctrl->res_2    = 0xFFFFFF;  //Reserved Bits - Write 0
+ */
 }
 
 void tx_buffer_init(struct tx_buffer *tx_buff) {
@@ -51,7 +51,7 @@ void tx_buffer_init(struct tx_buffer *tx_buff) {
   fcs->dest_addr_mode = 0x02; //Destination Address Mode - Short (16-bit)
   fcs->frame_version = 0x01; //Frame Version - IEEE 802.15.4 TODO: ???
   fcs->source_address_mode = 0x02; //Source Addressing Mode - Short (16-bit)
-  
+
   //Setup MAC Header
   mac->sequence_number = 0x00; //Sequence # TODO: ???
   mac->dest_pan_id = 0x00; //Will be updated on send
@@ -112,18 +112,18 @@ void send_message(struct spi_bus *bus, struct system_control *ctrl) {
   unsigned char rx_sys_ctrl[SYS_CTRL_LEN];
   write_spi_msg(bus, rx_sys_ctrl, &ctrl, SYS_CTRL_LEN); //IT IS SENT
 
-  while(1) {
+  while (1) {
     unsigned char tx_status[SYS_STATUS_LEN] = {0x00};
     tx_status[0] = SYS_STATUS_REG;
     unsigned char rx_status[SYS_STATUS_LEN] = {0x00};
     write_spi_msg(bus, rx_status, tx_status, SYS_STATUS_LEN);
     printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
-    rx_status[1], rx_status[2], rx_status[3], rx_status[4], rx_status[5]);
+           rx_status[1], rx_status[2], rx_status[3], rx_status[4], rx_status[5]);
     struct timespec t;
     t.tv_sec = 1;
     t.tv_nsec = 0;
     nanosleep(&t, NULL);
-    }
+  }
 }
 
 void wait_for_msg(struct spi_bus * bus, struct system_control *ctrl) {
@@ -132,19 +132,19 @@ void wait_for_msg(struct spi_bus * bus, struct system_control *ctrl) {
   unsigned char rx_sys_ctrl[SYS_CTRL_LEN];
   write_spi_msg(bus, rx_sys_ctrl, &ctrl, SYS_CTRL_LEN); //RECEIVER ON
   //Wait for msg
-  
+
   //TODO: Interrupts, for now, we will poll
-  //Clear Status Register 
+  //Clear Status Register
   struct system_status sta;
   clear_status(bus, &sta);
   //Poll Status Event Register
-  while(1) {
+  while (1) {
     unsigned char tx_status[SYS_STATUS_LEN] = {0x00};
     tx_status[0] = SYS_STATUS_REG;
     unsigned char rx_status[SYS_STATUS_LEN] = {0x00};
     write_spi_msg(bus, rx_status, tx_status, SYS_STATUS_LEN);
     printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
-    rx_status[1], rx_status[2], rx_status[3], rx_status[4], rx_status[5]);
+           rx_status[1], rx_status[2], rx_status[3], rx_status[4], rx_status[5]);
     struct timespec t;
     t.tv_sec = 1;
     t.tv_nsec = 0;
@@ -162,9 +162,9 @@ int comms_check(struct spi_bus * const bus) {
     return 0;
   }
   printf("0x%02X 0x%02X 0x%02X 0x%02X\n",
-    rx_buf[1], rx_buf[2], rx_buf[3], rx_buf[4]);
-  return (rx_buf[1] == 0x30 && rx_buf[2] == 0x01 
-           && rx_buf[3] == 0xCA && rx_buf[4] == 0xDE);
+         rx_buf[1], rx_buf[2], rx_buf[3], rx_buf[4]);
+  return (rx_buf[1] == 0x30 && rx_buf[2] == 0x01
+          && rx_buf[3] == 0xCA && rx_buf[4] == 0xDE);
 
 }
 
@@ -173,7 +173,7 @@ int spi_init(struct spi_bus *bus) {
     perror("Failed to open spidev");
     return 1;
   }
-  bus->xfer->speed_hz = 3000000; 
+  bus->xfer->speed_hz = 3000000;
   bus->xfer->bits_per_word = 8;
   bus->xfer->delay_usecs = 0;
   bus->xfer->cs_change = 0;
@@ -199,7 +199,7 @@ int write_spi_msg(
 
 //Initialize Communications
 int decawave_comms_init(struct spi_bus * const bus, const uint16_t pan_id,
-  const uint16_t addr_id, const struct tx_fctrl *fctrl) {
+                        const uint16_t addr_id, const struct tx_fctrl *fctrl) {
   //Write the PAN ID and Addr ID
   struct panaddr pan_msg;
   pan_msg.reg = PANADDR_REG | WRITE;
@@ -207,13 +207,13 @@ int decawave_comms_init(struct spi_bus * const bus, const uint16_t pan_id,
   pan_msg.addr_id = addr_id;
   unsigned char rx_buf[PANADDR_LEN] = {0x00};
   write_spi_msg(bus, rx_buf, &pan_msg, PANADDR_LEN);
- (void) pan_msg; 
+  (void) pan_msg;
   // Write Check - Unit Test
   char tx_buf[PANADDR_LEN] = {PANADDR_REG, 0x00, 0x00, 0x00, 0x00};
   write_spi_msg(bus, rx_buf, tx_buf, PANADDR_LEN);
   (void) tx_buf;
   printf("0x%02X 0x%02X 0x%02X 0x%02X\n",
-    rx_buf[1], rx_buf[2], rx_buf[3], rx_buf[4]);
+         rx_buf[1], rx_buf[2], rx_buf[3], rx_buf[4]);
   if ((rx_buf[1] | (rx_buf[2] << 8)) != pan_id) {
     printf("Did not set PAN_ID (reading 0x%02X 0x%02X)\n", rx_buf[1], rx_buf[2]);
     return 1;
@@ -228,26 +228,26 @@ int decawave_comms_init(struct spi_bus * const bus, const uint16_t pan_id,
   unsigned char rx_fctrl_buf[TX_FCTRL_LEN] = {0x00};
   write_spi_msg(bus, rx_fctrl_buf, fctrl, TX_FCTRL_LEN);
 /*
-  char fctrl_buf[sizeof(struct tx_fctrl)];
-  memcpy(fctrl_buf, fctrl, sizeof(struct tx_fctrl));
-  printf("%02X\n", fctrl->tfle);
+   char fctrl_buf[sizeof(struct tx_fctrl)];
+   memcpy(fctrl_buf, fctrl, sizeof(struct tx_fctrl));
+   printf("%02X\n", fctrl->tfle);
 
-  printf("0x");
-  for (unsigned int i = 0; i < sizeof(struct tx_fctrl); i++) {
+   printf("0x");
+   for (unsigned int i = 0; i < sizeof(struct tx_fctrl); i++) {
     printf("%02X ", (unsigned)fctrl_buf[i]);
-  }
-  printf("\n");
-*/
+   }
+   printf("\n");
+ */
 
- return 0;
+  return 0;
 }
 
 
 int write_payload(struct spi_bus * const bus,
-              struct mac_header * const mac,
-              const unsigned char * const payload,
-              const int len,
-              const uint64_t timestamp) {
+                  struct mac_header * const mac,
+                  const unsigned char * const payload,
+                  const int len,
+                  const uint64_t timestamp) {
   (void) bus;
   (void) mac;
   (void) payload;
