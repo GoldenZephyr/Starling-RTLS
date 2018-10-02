@@ -119,10 +119,10 @@ void send_message(struct spi_bus *bus, struct system_control *ctrl) {
     write_spi_msg(bus, rx_status, tx_status, SYS_STATUS_LEN);
     printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
            rx_status[1], rx_status[2], rx_status[3], rx_status[4], rx_status[5]);
-    struct timespec t;
-    t.tv_sec = 1;
-    t.tv_nsec = 0;
-    nanosleep(&t, NULL);
+    struct timespec slptime;
+    slptime.tv_sec = 1;
+    slptime.tv_nsec = 0;
+    nanosleep(&slptime, NULL);
   }
 }
 
@@ -145,10 +145,10 @@ void wait_for_msg(struct spi_bus * bus, struct system_control *ctrl) {
     write_spi_msg(bus, rx_status, tx_status, SYS_STATUS_LEN);
     printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
            rx_status[1], rx_status[2], rx_status[3], rx_status[4], rx_status[5]);
-    struct timespec t;
-    t.tv_sec = 1;
-    t.tv_nsec = 0;
-    nanosleep(&t, NULL);
+    struct timespec slptime;
+    slptime.tv_sec = 1;
+    slptime.tv_nsec = 0;
+    nanosleep(&slptime, NULL);
   }
 }
 
@@ -163,8 +163,8 @@ int comms_check(struct spi_bus * const bus) {
   }
   printf("0x%02X 0x%02X 0x%02X 0x%02X\n",
          rx_buf[1], rx_buf[2], rx_buf[3], rx_buf[4]);
-  return (rx_buf[1] == 0x30 && rx_buf[2] == 0x01
-          && rx_buf[3] == 0xCA && rx_buf[4] == 0xDE);
+  return rx_buf[1] == 0x30 && rx_buf[2] == 0x01
+          && rx_buf[3] == 0xCA && rx_buf[4] == 0xDE;
 
 }
 
@@ -258,6 +258,7 @@ int write_payload(struct spi_bus * const bus,
 
 
 void clear_status(struct spi_bus *bus, struct system_status *sta) {
+// #TODO: Krisna please add comment here
   sta->reg = SYS_STATUS_REG | WRITE;
   sta->irqs = 0;
   sta->cplock = 1;

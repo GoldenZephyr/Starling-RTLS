@@ -78,7 +78,6 @@ int main() {
   write_spi_msg(&bus0, rx_fc, tx_fc, TX_FCTRL_LEN);
   printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
          rx_fc[1],rx_fc[2],rx_fc[3],rx_fc[4],rx_fc[5]);
-  return 0;
 
   //Write in Payload
   printf("Type in payload (%lu chars max):\n", sizeof(tx_buff.payload));
