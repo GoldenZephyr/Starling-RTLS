@@ -15,16 +15,16 @@
 #define SYS_CONF_REG 0x04
 #define SYS_CONF_LEN 5
 
-#define PAN_ID_LO 0x12
-#define PAN_ID_HI 0x34
-#define ADDR_ID_LO 0x13
-#define ADDR_ID_HI 0x37
+#define PAN_ID_LO 0xFF
+#define PAN_ID_HI 0xFF
+#define ADDR_ID_LO 0xFF
+#define ADDR_ID_HI 0xFF
 
 #define TX_FCTRL_REG 0x08
 #define TX_FCTRL_LEN 6
 
 #define TX_BUFFER_REG 0x09
-#define TX_BUFFER_LEN 128
+#define TX_BUFFER_LEN 28
 
 #define SYS_CTRL_REG 0x0D
 #define SYS_CTRL_LEN 5
@@ -33,7 +33,7 @@
 #define SYS_STATUS_LEN 6
 
 //TODO: Standardize this
-#define PAYLOAD_LEN 114
+#define PAYLOAD_LEN 16
 
 
 struct spi_bus {
@@ -87,11 +87,11 @@ struct __attribute__((__packed__)) mac_header {
   uint16_t source_addr;
 };
 
-//TX Buffer - 127 Octets
+//TX Buffer -  Octets
 struct __attribute__((__packed__)) tx_buffer {
   uint8_t reg;
   struct mac_header mac_header;
-  uint8_t payload[114]; //127 - 11 - 2 = 114 Bytes
+  uint8_t payload[PAYLOAD_LEN]; //TODO: Longer? 16 Bytes
 };
 
 //System Control - 4 Bytes

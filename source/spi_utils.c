@@ -4,17 +4,18 @@
 #include <fcntl.h>
 #include <linux/spi/spidev.h>
 #include <time.h>
+#include <string.h>
 
 #include "spi_comms.h"
 
 //Initializes tx_fctrl with our parameters
 void frame_control_init(struct tx_fctrl *fctrl) {
   fctrl->reg      = TX_FCTRL_REG | WRITE;
-  fctrl->tflen    = 0x7F; //Frame Length - 127 Bytes
+  fctrl->tflen    = 0x0B + PAYLOAD_LEN; //Frame Length - MAC Header + Payload
   fctrl->tfle     = 0x00;  //Extended Frame - No
   fctrl->res_1    = 0x00;  //Reserved Bits - Write 0
   fctrl->txbr     = 0x02;  //Transmit Bitrate - 6.8Mbps
-  fctrl->tr       = 0x01;  //Ranging Frame - Yes (Unused)
+  fctrl->tr       = 0x00;  //Ranging Frame - No (Unused)
   fctrl->txprf    = 0x01;  //Transmit Preamble Repitition Rate - 16Mhz
   fctrl->txpsr    = 0x01;
   fctrl->pe       = 0x01;  //Preamble Length Selection - 128 Symbols
@@ -37,7 +38,7 @@ void frame_control_init(struct tx_fctrl *fctrl) {
 }
 
 void tx_buffer_init(struct tx_buffer *tx_buff) {
-  tx_buff->reg = TX_BUFFER_REG;
+  tx_buff->reg = TX_BUFFER_REG | WRITE;
   struct mac_header *mac = &tx_buff->mac_header;
   struct frame_control *fcs = &mac->frame_control;
 
@@ -53,9 +54,9 @@ void tx_buffer_init(struct tx_buffer *tx_buff) {
   fcs->source_address_mode = 0x02; //Source Addressing Mode - Short (16-bit)
   
   //Setup MAC Header
-  mac->sequence_number = 0x00; //Sequence # TODO: ???
-  mac->dest_pan_id = 0x00; //Will be updated on send
-  mac->dest_addr = 0x00; //Will be updated on send
+  mac->sequence_number = 0x01; //Sequence # TODO: ???
+  mac->dest_pan_id = PAN_ID_LO | (PAN_ID_HI << 8);
+  mac->dest_addr = PAN_ID_LO | (PAN_ID_HI << 8);
   mac->source_pan_id = PAN_ID_LO | (PAN_ID_HI << 8);
   mac->source_addr = ADDR_ID_LO | (ADDR_ID_HI << 8);
 }
@@ -110,8 +111,23 @@ void send_message(struct spi_bus *bus, struct system_control *ctrl) {
   //Setup System Control to send
   ctrl->txstrt = 0x01;
   unsigned char rx_sys_ctrl[SYS_CTRL_LEN];
+  unsigned char tx_test[SYS_CTRL_LEN];
+  memcpy(tx_test, ctrl, SYS_CTRL_LEN);
+  for (int i=0;i<SYS_CTRL_LEN;i++){
+    printf("0x%02X ", tx_test[i]);
+  }
+  printf("\n");
   write_spi_msg(bus, rx_sys_ctrl, &ctrl, SYS_CTRL_LEN); //IT IS SENT
-
+  return;
+  //Check Register
+  unsigned char rx_test[SYS_CTRL_LEN] = {0x00};
+  rx_test[0] = SYS_CTRL_REG;
+  memset(rx_sys_ctrl, 0x00, SYS_CTRL_LEN);
+  write_spi_msg(bus, rx_sys_ctrl, rx_test, SYS_CTRL_LEN);
+  for (int i=1;i<SYS_CTRL_LEN;i++){
+    printf("0x%02X ", rx_sys_ctrl[i]);
+  }
+  printf("\n");
   while(1) {
     unsigned char tx_status[SYS_STATUS_LEN] = {0x00};
     tx_status[0] = SYS_STATUS_REG;
@@ -120,8 +136,8 @@ void send_message(struct spi_bus *bus, struct system_control *ctrl) {
     printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
     rx_status[1], rx_status[2], rx_status[3], rx_status[4], rx_status[5]);
     struct timespec t;
-    t.tv_sec = 1;
-    t.tv_nsec = 0;
+    t.tv_sec = 0;
+    t.tv_nsec = 5000000;
     nanosleep(&t, NULL);
     }
 }
@@ -135,8 +151,8 @@ void wait_for_msg(struct spi_bus * bus, struct system_control *ctrl) {
   
   //TODO: Interrupts, for now, we will poll
   //Clear Status Register 
-  struct system_status sta;
-  clear_status(bus, &sta);
+  //struct system_status sta;
+  //clear_status(bus, &sta);
   //Poll Status Event Register
   while(1) {
     unsigned char tx_status[SYS_STATUS_LEN] = {0x00};
@@ -220,9 +236,14 @@ int decawave_comms_init(struct spi_bus * const bus, const uint16_t pan_id,
   }
   if ((rx_buf[3] | (rx_buf[4] << 8)) != addr_id) {
     printf("Did not set ADDR_ID (reading 0x%02X 0x%02X)\n", rx_buf[1], rx_buf[2]);
-//    return 1;
+    return 1;
   }
-
+  //Fix PLL Clock?
+  unsigned char ec_ctrl_tx[5] = {0x00};
+  unsigned char ec_ctrl_rx[5] = {0x00};
+  ec_ctrl_tx[0] = 0x24 | WRITE;
+  ec_ctrl_tx[1] = 0x04;
+  write_spi_msg(bus, ec_ctrl_rx, ec_ctrl_tx, 5);
 
   //Write the tx_fctrl register
   unsigned char rx_fctrl_buf[TX_FCTRL_LEN] = {0x00};

@@ -1,7 +1,7 @@
 .PHONY: all, clean
 .DEFAULT_GOAL := all
 CC = gcc
-CCFLAGS = -Wall -Werror -Wextra -pedantic -g -O2 -std=gnu99
+CCFLAGS = -Wall -Werror -Wextra -pedantic -g -O0 -std=gnu99
 INCLUDE = include
 
 SINGLE_MESSAGE_DEPENDS = source/single_message.c source/spi_utils.c
