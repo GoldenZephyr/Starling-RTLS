@@ -17,13 +17,15 @@ int main() {
   char sel[5];
   printf("Select device (0/1):\n");
   char i_name[20];
-  fgets(sel, sizeof(sel), stdin);
-  if (sel[0] == '0') {
+  char* ret = fgets(sel, sizeof(sel), stdin);
+  if (ret == NULL) {
+    printf("End of file reached before input");
+  } else if (sel[0] == '0') {
     memcpy(i_name,"/dev/spidev0.0",sizeof(i_name));
   } else if (sel[0] == '1') { 
     memcpy(i_name,"/dev/spidev1.0",sizeof(i_name));
   } else {
-    return 0;
+    return EXIT_FAILURE;
   }
   struct spi_ioc_transfer xfer0;
 
@@ -52,11 +54,11 @@ int main() {
 
   //Setup System Configure
   sys_conf_init(&sys_conf);
-  char conf_rx[SYS_CONF_LEN] = {0x00};
+  unsigned char conf_rx[SYS_CONF_LEN] = {0x00};
   write_spi_msg(&bus0, conf_rx, &sys_conf, SYS_CONF_LEN);
   //Load Microcode
-  char otp_crtl_rx[4] = {0x00};
-  char opt_ctrl_tx[4] = {0x00};
+  unsigned char otp_ctrl_rx[4] = {0x00};
+  unsigned char otp_ctrl_tx[4] = {0x00};
   otp_ctrl_tx[0] = 0x2D | 0xC0;
   otp_ctrl_tx[1] = 0x06;
   otp_ctrl_tx[3] = 0x80;
@@ -71,26 +73,31 @@ int main() {
     exit(EXIT_FAILURE);
   }
   //Confirm fctrl
-  char tx_fc[TX_FCTRL_LEN] = {0x00};
+  unsigned char tx_fc[TX_FCTRL_LEN] = {0x00};
   tx_fc[0] = TX_FCTRL_REG;
-  char rx_fc[TX_FCTRL_LEN] = {0x00};
+  unsigned char rx_fc[TX_FCTRL_LEN] = {0x00};
   write_spi_msg(&bus0, rx_fc, tx_fc, TX_FCTRL_LEN);
   printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
     rx_fc[1],rx_fc[2],rx_fc[3],rx_fc[4],rx_fc[5]);
   return 0;
 
   //Write in Payload
-  printf("Type in payload (%d chars max):\n", sizeof(tx_buff.payload));
+  printf("Type in payload (%lu chars max):\n", sizeof(tx_buff.payload));
   printf("No payload for receive mode\n");
-  fgets((char *) &tx_buff.payload, sizeof(tx_buff.payload), stdin);
-  printf("%s", tx_buff.payload);
+  ret = fgets((char *) &tx_buff.payload, sizeof(tx_buff.payload), stdin);
+  if (ret == NULL){
+    printf("Error reading tx_buff.payload");
+    exit(EXIT_FAILURE);
+  } else {
+    printf("%s", tx_buff.payload);
+  }
    
   sys_ctrl_init(&sys_ctrl);
   if (tx_buff.payload[0] == '\n') {
     printf("Waiting for msg...\n");
     wait_for_msg(&bus0, &sys_ctrl);
   } else { //Transmit Message
-    char rx_payload_buf[TX_BUFFER_LEN] = {0x00};
+    unsigned char rx_payload_buf[TX_BUFFER_LEN] = {0x00};
     write_spi_msg(&bus0, rx_payload_buf, &tx_buff, TX_BUFFER_LEN);
     //Transmit Message
     send_message(&bus0, &sys_ctrl);
@@ -199,27 +206,27 @@ void sys_conf_init(struct system_conf *conf) {
 void send_message(struct spi_bus *bus, struct system_control *ctrl) {
   //Setup System Control to send
   ctrl->txstrt = 0x01;
-  char rx_sys_ctrl[SYS_CTRL_LEN];
+  unsigned char rx_sys_ctrl[SYS_CTRL_LEN];
   write_spi_msg(bus, rx_sys_ctrl, &ctrl, SYS_CTRL_LEN); //IT IS SENT
 
-while(1) {
-  char tx_status[SYS_STATUS_LEN] = {0x00};
-  tx_status[0] = SYS_STATUS_REG;
-  char rx_status[SYS_STATUS_LEN] = {0x00};
-  write_spi_msg(bus, rx_status, tx_status, SYS_STATUS_LEN);
-  printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
-  rx_status[1], rx_status[2], rx_status[3], rx_status[4], rx_status[5]);
-  struct timespec t;
-  t.tv_sec = 1;
-  t.tv_nsec = 0;
-  nanosleep(&t, NULL);
-  }
+  while(1) {
+    unsigned char tx_status[SYS_STATUS_LEN] = {0x00};
+    tx_status[0] = SYS_STATUS_REG;
+    unsigned char rx_status[SYS_STATUS_LEN] = {0x00};
+    write_spi_msg(bus, rx_status, tx_status, SYS_STATUS_LEN);
+    printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
+    rx_status[1], rx_status[2], rx_status[3], rx_status[4], rx_status[5]);
+    struct timespec t;
+    t.tv_sec = 1;
+    t.tv_nsec = 0;
+    nanosleep(&t, NULL);
+    }
 }
 
 void wait_for_msg(struct spi_bus * bus, struct system_control *ctrl) {
   //Turn on receiver
   ctrl->rxenab = 0x01;
-  char rx_sys_ctrl[SYS_CTRL_LEN];
+  unsigned char rx_sys_ctrl[SYS_CTRL_LEN];
   write_spi_msg(bus, rx_sys_ctrl, &ctrl, SYS_CTRL_LEN); //RECEIVER ON
   //Wait for msg
   
@@ -229,16 +236,16 @@ void wait_for_msg(struct spi_bus * bus, struct system_control *ctrl) {
   clear_status(bus, &sta);
   //Poll Status Event Register
   while(1) {
-  char tx_status[SYS_STATUS_LEN] = {0x00};
-  tx_status[0] = SYS_STATUS_REG;
-  char rx_status[SYS_STATUS_LEN] = {0x00};
-  write_spi_msg(bus, rx_status, tx_status, SYS_STATUS_LEN);
-  printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
-  rx_status[1], rx_status[2], rx_status[3], rx_status[4], rx_status[5]);
-  struct timespec t;
-  t.tv_sec = 1;
-  t.tv_nsec = 0;
-  nanosleep(&t, NULL);
+    unsigned char tx_status[SYS_STATUS_LEN] = {0x00};
+    tx_status[0] = SYS_STATUS_REG;
+    unsigned char rx_status[SYS_STATUS_LEN] = {0x00};
+    write_spi_msg(bus, rx_status, tx_status, SYS_STATUS_LEN);
+    printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
+    rx_status[1], rx_status[2], rx_status[3], rx_status[4], rx_status[5]);
+    struct timespec t;
+    t.tv_sec = 1;
+    t.tv_nsec = 0;
+    nanosleep(&t, NULL);
   }
 }
 
@@ -246,10 +253,11 @@ void wait_for_msg(struct spi_bus * bus, struct system_control *ctrl) {
 //Checks that we can read the device ID
 //Returns 1 if we can, 0 if we cannot
 int comms_check(struct spi_bus * const bus) {
-  char rx_buf[DEV_ID_LEN] = {0x00};
-  char tx_buf[DEV_ID_LEN] = {0x00};
-  if (write_spi_msg(bus, rx_buf, tx_buf, DEV_ID_LEN) < 0)
+  unsigned char rx_buf[DEV_ID_LEN] = {0x00};
+  unsigned char tx_buf[DEV_ID_LEN] = {0x00};
+  if (write_spi_msg(bus, rx_buf, tx_buf, DEV_ID_LEN) < 0) {
     return 0;
+  }
   printf("0x%02X 0x%02X 0x%02X 0x%02X\n",
     rx_buf[1], rx_buf[2], rx_buf[3], rx_buf[4]);
   return (rx_buf[1] == 0x30 && rx_buf[2] == 0x01 
@@ -273,7 +281,7 @@ int spi_init(struct spi_bus *bus) {
 }
 
 int write_spi_msg(
-  struct spi_bus * bus, char * const rx, const void * const tx, int len) {
+  struct spi_bus * bus, unsigned char * const rx, const void * const tx, int len) {
   bus->xfer->rx_buf = (unsigned long) rx;
   bus->xfer->tx_buf = (unsigned long) tx;
   bus->xfer->len = len;
@@ -294,7 +302,7 @@ int decawave_comms_init(struct spi_bus * const bus, const uint16_t pan_id,
   pan_msg.reg = PANADDR_REG | WRITE;
   pan_msg.pan_id = pan_id;
   pan_msg.addr_id = addr_id;
-  char rx_buf[PANADDR_LEN] = {0x00};
+  unsigned char rx_buf[PANADDR_LEN] = {0x00};
   write_spi_msg(bus, rx_buf, &pan_msg, PANADDR_LEN);
  (void) pan_msg; 
   // Write Check - Unit Test
@@ -314,7 +322,7 @@ int decawave_comms_init(struct spi_bus * const bus, const uint16_t pan_id,
 
 
   //Write the tx_fctrl register
-  char rx_fctrl_buf[TX_FCTRL_LEN] = {0x00};
+  unsigned char rx_fctrl_buf[TX_FCTRL_LEN] = {0x00};
   write_spi_msg(bus, rx_fctrl_buf, fctrl, TX_FCTRL_LEN);
 /*
   char fctrl_buf[sizeof(struct tx_fctrl)];
@@ -334,7 +342,7 @@ int decawave_comms_init(struct spi_bus * const bus, const uint16_t pan_id,
 
 int write_payload(struct spi_bus * const bus,
               struct mac_header * const mac,
-              const char * const payload,
+              const unsigned char * const payload,
               const int len,
               const uint64_t timestamp) {
   (void) bus;
@@ -384,6 +392,6 @@ void clear_status(struct spi_bus *bus, struct system_status *sta) {
   sta->rxprej = 1;
   sta->txpute = 0;
   sta->res_2 = 0;
-  char rx_buf[SYS_STATUS_LEN];
+  unsigned char rx_buf[SYS_STATUS_LEN];
   write_spi_msg(bus, rx_buf, sta, SYS_STATUS_LEN);
 }

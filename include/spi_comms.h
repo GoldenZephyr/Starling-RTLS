@@ -204,13 +204,13 @@ void wait_for_msg(struct spi_bus *bus, struct system_control *ctrl);
 void clear_status(struct spi_bus *bus, struct system_status *sta);
 
 int write_spi_msg(struct spi_bus *bus,
-                  char * const rx,
+                  unsigned char * const rx,
                   const void * const tx,
                   int len);
 
 int write_payload(struct spi_bus *bus,
               struct mac_header * const mac,
-              const char * const payload,
+              const unsigned char * const payload,
               const int len,
               const uint64_t timestamp);
 
