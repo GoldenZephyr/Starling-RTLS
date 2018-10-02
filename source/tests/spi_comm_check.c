@@ -33,9 +33,3 @@ int main() {
   return 0;
 }
 
-int spi_init(struct spi_ioc_transfer *xfer) {
-  
-
-
-}
-
