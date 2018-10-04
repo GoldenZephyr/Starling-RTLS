@@ -29,6 +29,9 @@
 #define SYS_CTRL_REG 0x0D
 #define SYS_CTRL_LEN 5
 
+#define SYS_MASK_REG 0x0E
+#define SYS_MASK_LEN 5
+
 #define SYS_STATUS_REG 0x0F
 #define SYS_STATUS_LEN 6
 
@@ -141,6 +144,43 @@ struct __attribute__((__packed__)) system_conf {
   unsigned int aackpend : 1;
 };
 
+
+//System Event Mask - 4 Bytes
+struct __attribute__((__packed__)) system_mask {
+  unsigned int reg : 8;
+  unsigned int res : 1;
+  unsigned int mcplock : 1;
+  unsigned int mesyncr: 1;
+  unsigned int maat : 1;
+  unsigned int mtxfrb : 1;
+  unsigned int mtxprs : 1;
+  unsigned int mtxphs : 1;
+  unsigned int mtxfrs : 1;
+  unsigned int mrxprd : 1;
+  unsigned int mrxsfdd : 1;
+  unsigned int mldedone : 1;
+  unsigned int mrxphd : 1;
+  unsigned int mrxphe : 1;
+  unsigned int mrxdfr : 1;
+  unsigned int mrxfcg : 1;
+  unsigned int mrxfce : 1;
+  unsigned int mrxrfsl : 1;
+  unsigned int mrxrtfo : 1;
+  unsigned int mldeerr : 1;
+  unsigned int res_2 : 1;
+  unsigned int mrxovrr : 1;
+  unsigned int mrxpto : 1;
+  unsigned int mgpioirq : 1;
+  unsigned int mslp2ini : 1;
+  unsigned int mrfpllll : 1;
+  unsigned int mcpllll : 1;
+  unsigned int mrxsfdto : 1;
+  unsigned int mhpdwarn : 1;
+  unsigned int mtxberr : 1;
+  unsigned int maffrej : 1;
+  unsigned int res_3 : 2;
+};
+
 //System Status - 5 Bytes
 struct __attribute__((__packed__)) system_status {
   unsigned int reg : 8;
@@ -196,6 +236,8 @@ void tx_buffer_init(struct tx_buffer *tx_buff);
 void sys_conf_init(struct system_conf *conf);
 
 void sys_ctrl_init(struct system_control *ctrl);
+
+void sys_mask_init(struct system_mask *mask);
 
 void send_message(struct spi_bus *bus, struct system_control *ctrl);
 

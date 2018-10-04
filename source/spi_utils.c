@@ -107,6 +107,14 @@ void sys_conf_init(struct system_conf *conf) {
   conf->aackpend = 0; //Auto-Append - No
 }
 
+//Interrupt GPIO Mask (Masked = Will show)
+void system_mask_init(struct system_mask *mask) {
+  mask->reg = SYS_MASK_REG | WRITE;
+  mask->mcplock = 0; //Mask Clock PLL Lock - No
+  mask->mesyncr = 0; //Mask External Sync Clock Reset - No
+  mask->maat = 0; //Mask Auto-Ack - No
+}
+
 void send_message(struct spi_bus *bus, struct system_control *ctrl) {
   //Setup System Control to send
   ctrl->txstrt = 0x01;
@@ -119,27 +127,6 @@ void send_message(struct spi_bus *bus, struct system_control *ctrl) {
   printf("\n");
   write_spi_msg(bus, rx_sys_ctrl, &ctrl, SYS_CTRL_LEN); //IT IS SENT
   return;
-  //Check Register
-  unsigned char rx_test[SYS_CTRL_LEN] = {0x00};
-  rx_test[0] = SYS_CTRL_REG;
-  memset(rx_sys_ctrl, 0x00, SYS_CTRL_LEN);
-  write_spi_msg(bus, rx_sys_ctrl, rx_test, SYS_CTRL_LEN);
-  for (int i=1;i<SYS_CTRL_LEN;i++){
-    printf("0x%02X ", rx_sys_ctrl[i]);
-  }
-  printf("\n");
-  while (1) {
-    unsigned char tx_status[SYS_STATUS_LEN] = {0x00};
-    tx_status[0] = SYS_STATUS_REG;
-    unsigned char rx_status[SYS_STATUS_LEN] = {0x00};
-    write_spi_msg(bus, rx_status, tx_status, SYS_STATUS_LEN);
-    printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
-           rx_status[1], rx_status[2], rx_status[3], rx_status[4], rx_status[5]);
-    struct timespec slptime;
-    slptime.tv_sec = 1;
-    slptime.tv_nsec = 0;
-    nanosleep(&slptime, NULL);
-  }
 }
 
 void wait_for_msg(struct spi_bus * bus, struct system_control *ctrl) {
@@ -189,7 +176,7 @@ int spi_init(struct spi_bus *bus) {
     perror("Failed to open spidev");
     return 1;
   }
-  bus->xfer->speed_hz = 3000000;
+  bus->xfer->speed_hz = 2000000;
   bus->xfer->bits_per_word = 8;
   bus->xfer->delay_usecs = 0;
   bus->xfer->cs_change = 0;

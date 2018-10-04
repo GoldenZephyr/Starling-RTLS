@@ -33,30 +33,39 @@ int main() {
 //  struct system_conf sys_conf;
   struct system_control sys_ctrl;
 
-  bus0.interface_name = i_name;
-  bus0.xfer = &xfer0;
-  if (spi_init(&bus0) != 0)
-    exit(EXIT_FAILURE);
-  //Check for proper SPI setup
+    bus0.interface_name = i_name;
+    bus0.xfer = &xfer0;
+    if (spi_init(&bus0) != 0)
+      exit(EXIT_FAILURE);
+    //Check for proper SPI setup
   if (comms_check(&bus0) == 0) {
-    printf("SPI Error: Cannot read device ID\n");
-    exit(EXIT_FAILURE);
-  }
-
-
-  
-    sys_ctrl_init(&sys_ctrl);
-    while(1) { 
-    send_message(&bus0, &sys_ctrl);
-    unsigned char tx_status[SYS_STATUS_LEN] = {0x00};
-    tx_status[0] = SYS_STATUS_REG;
-    unsigned char rx_status[SYS_STATUS_LEN] = {0x00};
-    write_spi_msg(&bus0, rx_status, tx_status, SYS_STATUS_LEN);
-    printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
-    rx_status[1], rx_status[2], rx_status[3], rx_status[4], rx_status[5]);
+      printf("SPI Error: Cannot read device ID\n");
+      exit(EXIT_FAILURE);
+    } 
+    
     struct timespec t;
     t.tv_sec = 1;
-    t.tv_nsec = 0;
+    t.tv_nsec = 1;
+    sys_ctrl_init(&sys_ctrl);
+    unsigned char ctrl_buf[SYS_CTRL_LEN] = {0x00};
+    unsigned char stat_buf[SYS_STATUS_LEN] = {0x00};
+    unsigned char stat_tx[SYS_STATUS_LEN] = {0x00};
+    stat_tx[0] = SYS_STATUS_REG;
+    write_spi_msg(&bus0, stat_buf, stat_tx, SYS_STATUS_LEN);
+    printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
+      stat_buf[1], stat_buf[2], stat_buf[3], stat_buf[4], stat_buf[5]);
+
+    while(1) { 
+    sys_ctrl.txstrt = 0x01;
+    write_spi_msg(&bus0, ctrl_buf, &sys_ctrl, SYS_CTRL_LEN);
+    nanosleep(&t, NULL);
+    write_spi_msg(&bus0, stat_buf, stat_tx, SYS_STATUS_LEN);
+    printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
+    stat_buf[1], stat_buf[2], stat_buf[3], stat_buf[4], stat_buf[5]);
+
+    sys_ctrl_init(&sys_ctrl);
+    sys_ctrl.trxoff = 0x01;
+    write_spi_msg(&bus0, ctrl_buf, &sys_ctrl, SYS_CTRL_LEN);
     nanosleep(&t, NULL);
   }
   return 0;
