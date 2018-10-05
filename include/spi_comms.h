@@ -227,6 +227,36 @@ struct __attribute__((__packed__)) system_status {
   unsigned int res_2 : 5;
 };
 
+//RX Info - 4 Bytes
+struct __attribute__((__packed__)) rx_finfo {
+  unsigned int reg : 8;
+  unsigned int rfxlen : 7;
+  unsigned int rxfle : 3;
+  unsigned int res : 1;
+  unsigned int rxnspl : 2;
+  unsigned int rxbr : 2;
+  unsigned int rng : 1;
+  unsigned int rxprfr : 2;
+  unsigned int rxprsr : 2;
+  unsigned int rxpacc : 12;
+};
+
+struct __attribute__((__packed__)) rx_time {
+  uint64_t reg : 8;
+  uint64_t rx_stamp : 40;
+  uint64_t fp_index : 16;
+  uint64_t fp_ampl1 : 16;
+  uint64_t rx_rawst : 40;
+};
+
+struct __attribute__((__packed__)) rx_buffer { //Yeah it's tx_buffer...
+  uint8_t reg;
+  struct mac_header mac_header;
+  uint8_t payload[PAYLOAD_LEN];
+};
+
+
+
 int spi_init(struct spi_bus * const bus);
 
 int comms_check(struct spi_bus * const bus);
