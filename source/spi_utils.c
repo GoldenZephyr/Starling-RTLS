@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "spi_comms.h"
+#define STDOUT_FD 1
 
 //Initializes tx_fctrl with our parameters
 void frame_control_init(struct tx_fctrl *fctrl) {
@@ -116,41 +117,77 @@ void system_mask_init(struct system_mask *mask) {
 }
 
 void send_message(struct spi_bus *bus, struct system_control *ctrl) {
-  //Setup System Control to send
-  ctrl->txstrt = 0x01;
+  //Setup System Control to send 
+  sys_ctrl_init(ctrl); 
+  ctrl->txstrt = 0x01; //Set sending flag TODO: Add delayed Sending
   unsigned char rx_sys_ctrl[SYS_CTRL_LEN];
-  unsigned char tx_test[SYS_CTRL_LEN];
-  memcpy(tx_test, ctrl, SYS_CTRL_LEN);
-  for (int i=0;i<SYS_CTRL_LEN;i++){
-    printf("0x%02X ", tx_test[i]);
-  }
-  printf("\n");
-  write_spi_msg(bus, rx_sys_ctrl, &ctrl, SYS_CTRL_LEN); //IT IS SENT
+  write_spi_msg(bus, rx_sys_ctrl, ctrl, SYS_CTRL_LEN); //IT IS SENT
   return;
 }
 
 void wait_for_msg(struct spi_bus * bus, struct system_control *ctrl) {
-  //Turn on receiver
-  ctrl->rxenab = 0x01;
-  unsigned char rx_sys_ctrl[SYS_CTRL_LEN];
-  write_spi_msg(bus, rx_sys_ctrl, &ctrl, SYS_CTRL_LEN); //RECEIVER ON
-  //Wait for msg
+  
+  struct timespec slptime;
+  slptime.tv_sec = 0;
+  slptime.tv_nsec = 200000;
+  
+  //Load Microcode - TODO: Codify This
+  unsigned char tx_temp[4] = {0x00};
+  unsigned char rx_temp[4] = {0x00};
+  tx_temp[0] = 0x36 | WRITE | SUB_INDEX;
+  tx_temp[1] = 0x00; //Sub Index 0x00
+  tx_temp[2] = 0x01;
+  tx_temp[3] = 0x03;
+  write_spi_msg(bus, rx_temp, tx_temp, 4);
+  tx_temp[0] = 0x2D | WRITE | SUB_INDEX;
+  tx_temp[1] = 0x06;
+  tx_temp[2] = 0x00;
+  tx_temp[3] = 0x80;
+  write_spi_msg(bus, rx_temp, tx_temp, 4);
+  nanosleep(&slptime, NULL);
+  tx_temp[0] = 0x36 | WRITE | SUB_INDEX;
+  tx_temp[1] = 0x00; //Sub Index 0x00
+  tx_temp[2] = 0x00;
+  tx_temp[3] = 0x02;
+  write_spi_msg(bus, rx_temp, tx_temp, 4);
+  slptime.tv_sec = 1;
+  slptime.tv_nsec = 0;
 
+  //Turn on receiver
+  sys_ctrl_init(ctrl); 
+  unsigned char rx_sys_ctrl[SYS_CTRL_LEN] = {0x00};
+  ctrl->rxenab = 0x01;
+  write_spi_msg(bus, rx_sys_ctrl, ctrl, SYS_CTRL_LEN); //RECEIVER ON
+  nanosleep(&slptime, NULL);
+  
+  //Wait for msg
   //TODO: Interrupts, for now, we will poll
   //Clear Status Register 
-  //struct system_status sta;
-  //clear_status(bus, &sta);
   //Poll Status Event Register
+
+  struct system_status sta;
+  unsigned char tx_status[SYS_STATUS_LEN] = {0x00};
+  unsigned char rx_status[SYS_STATUS_LEN] = {0x00};
+
+  unsigned char rx_buffer_tx[RX_BUFFER_LEN] = {0x00};
+  rx_buffer_tx[0] = RX_BUFFER_REG;
+  unsigned char rx_buffer_rx[RX_BUFFER_LEN] = {0x00};
+  
   while (1) {
-    unsigned char tx_status[SYS_STATUS_LEN] = {0x00};
     tx_status[0] = SYS_STATUS_REG;
-    unsigned char rx_status[SYS_STATUS_LEN] = {0x00};
     write_spi_msg(bus, rx_status, tx_status, SYS_STATUS_LEN);
-    printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
-           rx_status[1], rx_status[2], rx_status[3], rx_status[4], rx_status[5]);
-    struct timespec slptime;
-    slptime.tv_sec = 1;
-    slptime.tv_nsec = 0;
+    //Check if there is data 
+    //printf("0x%02X 0x%02X 0x%02X 0x%02X\n", rx_status[1]
+    //  ,rx_status[2], rx_status[3], rx_status[4]);
+    if (rx_status[2] & 0x20) {  //Check Data Ready Status
+      printf("GOT MESSAGE!\n");
+      //Clear Status Pin
+      clear_status(bus, &sta);
+      //Get Message
+      write_spi_msg(bus, rx_buffer_rx, rx_buffer_tx, RX_BUFFER_LEN);
+      //Write Message to stdout
+      write(STDOUT_FD, rx_buffer_rx, sizeof(rx_buffer_rx));
+    }
     nanosleep(&slptime, NULL);
   }
 }
@@ -223,12 +260,6 @@ int decawave_comms_init(struct spi_bus * const bus, const uint16_t pan_id,
     printf("Did not set ADDR_ID (reading 0x%02X 0x%02X)\n", rx_buf[1], rx_buf[2]);
     return 1;
   }
-  //Fix PLL Clock?
-  unsigned char ec_ctrl_tx[5] = {0x00};
-  unsigned char ec_ctrl_rx[5] = {0x00};
-  ec_ctrl_tx[0] = 0x24 | WRITE;
-  ec_ctrl_tx[1] = 0x04;
-  write_spi_msg(bus, ec_ctrl_rx, ec_ctrl_tx, 5);
 
   //Write the tx_fctrl register
   unsigned char rx_fctrl_buf[TX_FCTRL_LEN] = {0x00};
@@ -264,19 +295,19 @@ int write_payload(struct spi_bus * const bus,
 
 
 void clear_status(struct spi_bus *bus, struct system_status *sta) {
-// #TODO: Krisna please add comment here
+//Clears all RX/TX System Status Flags
   sta->reg = SYS_STATUS_REG | WRITE;
   sta->irqs = 0;
-  sta->cplock = 1;
-  sta->esyncr = 1;
-  sta->aat = 1;
+  sta->cplock = 0;
+  sta->esyncr = 0;
+  sta->aat = 0;
   sta->txfrb = 1;
   sta->txprs = 1;
   sta->txphs = 1;
   sta->txfrs = 1;
   sta->rxprd = 1;
   sta->rxsfdd = 1;
-  sta->ldedone = 1;
+  sta->ldedone = 0;
   sta->rxphd = 1;
   sta->rxphe = 1;
   sta->rxdfr = 1;
@@ -284,14 +315,14 @@ void clear_status(struct spi_bus *bus, struct system_status *sta) {
   sta->rxfce = 1;
   sta->rxrfsl = 1;
   sta->rxrfto = 1;
-  sta->ldeerr = 1;
+  sta->ldeerr = 0;
   sta->res = 0;
   sta->rxovrr = 0;
   sta->rxpto = 1;
   sta->gpioirq = 1;
   sta->slpinit = 0;
-  sta->rfpll = 1;
-  sta->clkpll = 1;
+  sta->rfpll = 0;
+  sta->clkpll = 0;
   sta->rxsfdto = 1;
   sta->hpdwarn = 0;
   sta->txberr = 1;

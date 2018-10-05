@@ -2,6 +2,7 @@
 #include <stdint.h>
 
 #define WRITE 0x80
+#define SUB_INDEX 0x40
 
 #define DEV_ID_REG 0x00
 #define DEV_ID_LEN 5
@@ -23,8 +24,13 @@
 #define TX_FCTRL_REG 0x08
 #define TX_FCTRL_LEN 6
 
+#define PAYLOAD_LEN 64
+
 #define TX_BUFFER_REG 0x09
-#define TX_BUFFER_LEN 28
+#define TX_BUFFER_LEN PAYLOAD_LEN + 12
+
+#define RX_BUFFER_REG 0x11
+#define RX_BUFFER_LEN PAYLOAD_LEN + 12
 
 #define SYS_CTRL_REG 0x0D
 #define SYS_CTRL_LEN 5
@@ -36,7 +42,6 @@
 #define SYS_STATUS_LEN 6
 
 //TODO: Standardize this
-#define PAYLOAD_LEN 16
 
 
 struct spi_bus {
@@ -94,7 +99,7 @@ struct __attribute__((__packed__)) mac_header {
 struct __attribute__((__packed__)) tx_buffer {
   uint8_t reg;
   struct mac_header mac_header;
-  uint8_t payload[PAYLOAD_LEN]; //TODO: Longer? 16 Bytes
+  uint8_t payload[PAYLOAD_LEN]; //TODO: Longer? 64 Bytes
 };
 
 //System Control - 4 Bytes

@@ -28,55 +28,66 @@ int main() {
   }
 
   struct spi_ioc_transfer xfer0;
-  struct tx_fctrl fctrl;
-  struct tx_buffer tx_buff;
 //  struct system_conf sys_conf;
   struct system_control sys_ctrl;
 
-    bus0.interface_name = i_name;
-    bus0.xfer = &xfer0;
-    if (spi_init(&bus0) != 0)
-      exit(EXIT_FAILURE);
-    //Check for proper SPI setup
+  bus0.interface_name = i_name;
+  bus0.xfer = &xfer0;
+  if (spi_init(&bus0) != 0)
+    exit(EXIT_FAILURE);
+  //Check for proper SPI setup
   if (comms_check(&bus0) == 0) {
-      printf("SPI Error: Cannot read device ID\n");
-      exit(EXIT_FAILURE);
-    } 
-    
-    struct timespec t;
-    t.tv_sec = 1;
-    t.tv_nsec = 1;
-    sys_ctrl_init(&sys_ctrl);
-    unsigned char ctrl_buf[SYS_CTRL_LEN] = {0x00};
-    unsigned char stat_buf[SYS_STATUS_LEN] = {0x00};
-    unsigned char stat_tx[SYS_STATUS_LEN] = {0x00};
-    stat_tx[0] = SYS_STATUS_REG;
-    write_spi_msg(&bus0, stat_buf, stat_tx, SYS_STATUS_LEN);
-    printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
-      stat_buf[1], stat_buf[2], stat_buf[3], stat_buf[4], stat_buf[5]);
+    printf("SPI Error: Cannot read device ID\n");
+    exit(EXIT_FAILURE);
+  } 
+  sys_ctrl_init(&sys_ctrl);
 
-    while(1) { 
-    sys_ctrl.txstrt = 0x01;
-    write_spi_msg(&bus0, ctrl_buf, &sys_ctrl, SYS_CTRL_LEN);
-    nanosleep(&t, NULL);
-    write_spi_msg(&bus0, stat_buf, stat_tx, SYS_STATUS_LEN);
-    printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
-    stat_buf[1], stat_buf[2], stat_buf[3], stat_buf[4], stat_buf[5]);
+  //Setup tx_fctrl  
+  struct tx_fctrl fctrl;
+  frame_control_init(&fctrl);
+  //Setup tx_buffer 
+  struct tx_buffer tx_buff;
+  tx_buffer_init(&tx_buff);
 
-    sys_ctrl_init(&sys_ctrl);
-    sys_ctrl.trxoff = 0x01;
-    write_spi_msg(&bus0, ctrl_buf, &sys_ctrl, SYS_CTRL_LEN);
-    nanosleep(&t, NULL);
+  if (decawave_comms_init(&bus0, 0xFFFF, 0xFFFF, &fctrl) == 1) {
+    exit(EXIT_FAILURE);
+  }
+
+  //Write in Payload
+  printf("Type in payload (%d chars max):\n", sizeof(tx_buff.payload));
+  printf("No payload for receive mode\n");
+  ret = fgets((char *) &tx_buff.payload, sizeof(tx_buff.payload), stdin);
+  if (ret == NULL) {
+    printf("Error reading tx_buff.payload");
+    exit(EXIT_FAILURE);
+  } else {
+    printf("%s", tx_buff.payload);
+  }
+
+  //Check Mode
+  if (tx_buff.payload[0] == '\n') {
+    printf("Waiting for msg...\n");
+    wait_for_msg(&bus0, &sys_ctrl);
+  } else { //Transmit Message
+    //Write Data Buffer
+    unsigned char rx_payload_buf[TX_BUFFER_LEN] = {0x00};
+//    char data_buff[TX_BUFFER_LEN];
+//    memcpy(data_buff, &tx_buff, sizeof(struct tx_buffer));
+//    for(int i=0;i<TX_BUFFER_LEN;i++) {
+//      printf("0x%02X ", data_buff[i]);
+//    }
+//    printf("\n");
+    //Write Buffer
+    write_spi_msg(&bus0, rx_payload_buf, &tx_buff, TX_BUFFER_LEN);
+    //Transmit Message
+    send_message(&bus0, &sys_ctrl);
   }
   return 0;
+
   
   //struct system_status sta;
   //Clear Status reg
   //clear_status(&bus0, &sta);
-  //Setup tx_fctrl
-  frame_control_init(&fctrl);
-  //Setup tx_buffer
-  tx_buffer_init(&tx_buff);
 
   //Setup System Configure
 //  sys_conf_init(&sys_conf);
@@ -95,9 +106,6 @@ int main() {
   //Initialize frame control / Device IDs
   //const uint16_t pan_id = PAN_ID_LO | (PAN_ID_HI << 8);
   //const uint16_t addr_id = ADDR_ID_LO | (ADDR_ID_HI << 8);
-  if (decawave_comms_init(&bus0, 0xFFFF, 0xFFFF, &fctrl) == 1) {
-    exit(EXIT_FAILURE);
-  }
 // Confirm fctrl
   unsigned char tx_fc[TX_FCTRL_LEN] = {0x00};
   tx_fc[0] = TX_FCTRL_REG;
@@ -106,33 +114,6 @@ int main() {
   printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n",
     rx_fc[1],rx_fc[2],rx_fc[3],rx_fc[4],rx_fc[5]);
 
-  //Write in Payload
-  printf("Type in payload (%d chars max):\n", sizeof(tx_buff.payload));
-  printf("No payload for receive mode\n");
-  ret = fgets((char *) &tx_buff.payload, sizeof(tx_buff.payload), stdin);
-  if (ret == NULL) {
-    printf("Error reading tx_buff.payload");
-    exit(EXIT_FAILURE);
-  } else {
-    printf("%s", tx_buff.payload);
-  }
 
-  sys_ctrl_init(&sys_ctrl);
-  if (tx_buff.payload[0] == '\n') {
-    printf("Waiting for msg...\n");
-    wait_for_msg(&bus0, &sys_ctrl);
-  } else { //Transmit Message
-    unsigned char rx_payload_buf[TX_BUFFER_LEN] = {0x00};
-    char data_buff[TX_BUFFER_LEN];
-    memcpy(data_buff, &tx_buff, sizeof(struct tx_buffer));
-    for(int i=0;i<TX_BUFFER_LEN;i++) {
-      printf("0x%02X ", data_buff[i]);
-    }
-    printf("\n");
-    
-    write_spi_msg(&bus0, rx_payload_buf, &tx_buff, TX_BUFFER_LEN);
-    //Transmit Message
-    send_message(&bus0, &sys_ctrl);
-  }
 }
 
