@@ -6,12 +6,14 @@
 #include <string.h>
 #include <time.h>
 
+
 #include "mac_comms.h"
 #include "spi_comms.h"
 
 #define STDOUT_FD 1
 
 int main() {
+
   struct spi_bus bus0;
   char sel[5];
   printf("Select device (0/1):\n");
@@ -42,6 +44,7 @@ int main() {
   } 
   sys_ctrl_init(&sys_ctrl);
 
+  load_microcode(&bus0);
   //Setup tx_fctrl  
   struct tx_fctrl fctrl;
   frame_control_init(&fctrl);

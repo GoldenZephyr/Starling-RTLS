@@ -3,6 +3,7 @@
 CC = gcc
 CCFLAGS = -Wall -Werror -Wextra -pedantic -O3 -std=gnu99
 INCLUDE = include
+INC_WIRINGPI = wiringPi
 
 SINGLE_MESSAGE_DEPENDS = source/single_message.c source/spi_utils.c
 SPI_TEST_DEPENDS = source/tests/spi_comm_check.c

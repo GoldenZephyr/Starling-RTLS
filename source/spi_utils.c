@@ -9,6 +9,12 @@
 #include "spi_comms.h"
 #define STDOUT_FD 1
 
+//Interrupt Flag
+volatile sig_atomic_t interrupt_flag = 0;
+void gpio_interrupt(){
+  interrupt_flag = 1;
+}
+
 //Initializes tx_fctrl with our parameters
 void frame_control_init(struct tx_fctrl *fctrl) {
   fctrl->reg      = TX_FCTRL_REG | WRITE;
@@ -119,19 +125,32 @@ void system_mask_init(struct system_mask *mask) {
 void send_message(struct spi_bus *bus, struct system_control *ctrl) {
   //Setup System Control to send 
   sys_ctrl_init(ctrl); 
-  ctrl->txstrt = 0x01; //Set sending flag TODO: Add delayed Sending
+  ctrl->txstrt = 0x01;
   unsigned char rx_sys_ctrl[SYS_CTRL_LEN];
   write_spi_msg(bus, rx_sys_ctrl, ctrl, SYS_CTRL_LEN); //IT IS SENT
   return;
 }
 
-void wait_for_msg(struct spi_bus * bus, struct system_control *ctrl) {
-  
+void send_message_delay(struct spi_bus *bus, struct system_control *ctrl,
+  struct dx_time *delay_time) {
+  //Write in delay time
+  delay_time->reg = DX_TIME_REG | WRITE;
+  char rx_dx_time[DX_TIME_LEN] = {0x00};
+  write_spi_msg(bus, rx_dx_time, delay_time, DX_TIME_LEN);
+  //Setup System Control to send 
+  sys_ctrl_init(ctrl); 
+  ctrl->txstrt = 0x01; //Set sending flag
+  ctrl->txdlys = 0x01; //Set delayed send
+  unsigned char rx_sys_ctrl[SYS_CTRL_LEN];
+  write_spi_msg(bus, rx_sys_ctrl, ctrl, SYS_CTRL_LEN); //IT WILL BE SENT
+  return;
+}
+
+void load_microcode(struct spi_bus *bus) {
   struct timespec slptime;
   slptime.tv_sec = 0;
   slptime.tv_nsec = 200000;
   
-  //Load Microcode - TODO: Codify This
   unsigned char tx_temp[4] = {0x00};
   unsigned char rx_temp[4] = {0x00};
   tx_temp[0] = 0x36 | WRITE | SUB_INDEX;
@@ -150,6 +169,30 @@ void wait_for_msg(struct spi_bus * bus, struct system_control *ctrl) {
   tx_temp[2] = 0x00;
   tx_temp[3] = 0x02;
   write_spi_msg(bus, rx_temp, tx_temp, 4);
+}
+
+void wait_for_msg_int(struct spi_bus *bus, struct system_control *ctrl,
+  struct system_staus *sta) {
+  //Clear Status Reg
+  clear_status(bus, sta);
+  //Turn on receiver
+  sys_ctrl_init(ctrl); 
+  unsigned char rx_sys_ctrl[SYS_CTRL_LEN] = {0x00};
+  ctrl->rxenab = 0x01;
+  write_spi_msg(bus, rx_sys_ctrl, ctrl, SYS_CTRL_LEN); //RECEIVER ON
+  //Wait for GPIO Interrpt
+  wiringPilSR(INTERRUPT_PIN, INT_EDGE_RISING, gpio_interrput);
+  //Wait for Interrupt
+  while(interrupt_flag == 0) {};
+  //Clear Flag
+  interrupt_flag = 0;
+  //Clear Status Reg
+  clear_status(bus, sta);
+}
+
+void wait_for_msg(struct spi_bus * bus, struct system_control *ctrl) {
+  
+  struct timespec slptime;
   slptime.tv_sec = 1;
   slptime.tv_nsec = 0;
 
@@ -224,7 +267,7 @@ int spi_init(struct spi_bus *bus) {
 }
 
 int write_spi_msg(
-  struct spi_bus * bus, unsigned char * const rx, const void * const tx, int len) {
+  struct spi_bus * bus, void * const rx, const void * const tx, int len) {
   bus->xfer->rx_buf = (unsigned long) rx;
   bus->xfer->tx_buf = (unsigned long) tx;
   bus->xfer->len = len;
@@ -279,6 +322,54 @@ int decawave_comms_init(struct spi_bus * const bus, const uint16_t pan_id,
   return 0;
 }
 
+void ranging_send(struct spi_bus * bus, struct system_control *ctrl,
+  struct system_status *sta, struct tx_buffer *tx_buff) {
+ (void) bus; 
+ (void) ctrl;
+ (void) sta;
+ (void) tx_buff;
+}
+
+void ranging_recv(struct spi_bus * bus, struct system_control *ctrl,
+  struct sysyem_status *sta, struct tx_buffer *tx_buff) {
+ //Go into recieve moce - Wait for Message
+ wait_for_msg_int(bus, ctrl, sta);
+ //Grab Info
+ struct rx_data data = {0x00};
+ get_rx_data(bus, &data);
+ //Get Timestamp
+ uint64_t timestamp_rx_1 = data.timestamp.rx_stamp; //Lower 40 Bits
+ //Get TX Timestamp
+ uint64_t timestamp_tx_1 = data.buffer.timestamp;
+ //Compute Next Send Time
+ uint64_t timestamp_rx_2 = compute_timestamp(timestamp_rx_1, T_REPLY);
+ //Compose Response
+ struct dx_time delay_time; 
+ dx_time.delay_time = timestamp_rx_2;
+ tx_buff->timestamp = timestamp_rx_2;
+ //Write in new buffer
+ char buff_rx[TX_BUFFER_LEN];
+ write_spi_msg(bus, buff_rx, tx_buff, TX_BUFFER_LEN);
+ //Send Message
+ send_message_delay(bus, ctrl, timestamp_rx_2);
+ //Wait for Response
+ wait_for_msg_int(bus, ctrl, sta);
+ //Grab Info
+ struct rx_data data2 = {0x00};
+ get_rx_data(bus, &data2);
+ //Get Timestamp
+ uint64_t timestamp_rx_3 = data2.timestamp.rx_stamp; //Lower 40 Bits
+ //Get TX Timestamp
+ uint64_t timestamp_tx_3 = data2.buffer.timestamp;
+ //TODO: Propogation Logic
+}
+
+uint64_t compute_timestamp(uint64_t curr_time, uint64_t delay_time) {
+  uint64_t sum_time = curr_time + delay_time;
+  //Wrap around if we overflow
+  return (sum_time > 0xFFFFFFFFFF) ? 
+    delay_time - (0xFFFFFFFFFF - sum_time) : sum_time;
+}
 
 int write_payload(struct spi_bus * const bus,
                   struct mac_header * const mac,
@@ -293,6 +384,24 @@ int write_payload(struct spi_bus * const bus,
   return 0;
 }
 
+int get_rx_data(struct spi_bus *bus, struct rx_data *data) {
+  //Initialize structs
+  data->finfo.reg = RX_FINFO_REG;
+  data->timestamp.reg = RX_TIME_REG;
+  data->buffer.reg = RX_BUFFER_REG;
+  //Initalize TX Messages
+  char tx_finfo[RX_FINFO_LEN] = {0x00};
+  tx_finfo[0] = RX_FINFO_REG;
+  char tx_timestamp[RX_TIME_LEN] = {0x00};
+  tx_timestamp[0] = RX_TIME_REG;
+  char tx_buffer[TX_BUFFER_LEN] = {0x00};
+  tx_buffer[0] = RX_BUFFER_REG;
+  //Write Data Into Structs
+  write_spi_msg(bus, &data->finfo, tx_finfo, RX_FINFO_LEN);
+  write_spi_msg(bus, &data->timestamp, tx_timestamp, RX_TIME_LEN);
+  write_spi_msg(bus, &data->buffer, tx_buffer, RX_BUFFER_LEN);
+  return 0;
+}
 
 void clear_status(struct spi_bus *bus, struct system_status *sta) {
 //Clears all RX/TX System Status Flags

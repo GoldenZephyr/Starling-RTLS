@@ -27,10 +27,16 @@
 #define PAYLOAD_LEN 64
 
 #define TX_BUFFER_REG 0x09
-#define TX_BUFFER_LEN PAYLOAD_LEN + 12
+#define TX_BUFFER_LEN PAYLOAD_LEN + 12 + 5
 
 #define RX_BUFFER_REG 0x11
-#define RX_BUFFER_LEN PAYLOAD_LEN + 12
+#define RX_BUFFER_LEN PAYLOAD_LEN + 12 + 5 //Payload/Reg+Header/Timestamp
+
+#define RX_FINFO_REG 0x10
+#define RX_FINFO_LEN 5
+
+#define RX_TIME_REG 0x15
+#define RX_TIME_LEN 15
 
 #define SYS_CTRL_REG 0x0D
 #define SYS_CTRL_LEN 5
@@ -41,8 +47,10 @@
 #define SYS_STATUS_REG 0x0F
 #define SYS_STATUS_LEN 6
 
-//TODO: Standardize this
+#define DX_TIME_REG 0x0A
+#define DX_TIME_LEN 5
 
+#define INTERRUPT_PIN 3 //TODO: REVISE THIS
 
 struct spi_bus {
   const char *interface_name;
@@ -99,6 +107,7 @@ struct __attribute__((__packed__)) mac_header {
 struct __attribute__((__packed__)) tx_buffer {
   uint8_t reg;
   struct mac_header mac_header;
+  uint64_t timestamp : 40;
   uint8_t payload[PAYLOAD_LEN]; //TODO: Longer? 64 Bytes
 };
 
@@ -252,10 +261,21 @@ struct __attribute__((__packed__)) rx_time {
 struct __attribute__((__packed__)) rx_buffer { //Yeah it's tx_buffer...
   uint8_t reg;
   struct mac_header mac_header;
+  uint64_t timestamp : 40;
   uint8_t payload[PAYLOAD_LEN];
 };
 
+//Wrapper Struct - Has all transmission RX information
+struct __attribute__((__packed__)) rx_data {
+  struct rx_finfo finfo;
+  struct rx_time timestamp;
+  struct rx_buffer buffer;
+};
 
+struct __attribute__((__packed__)) dx_time {
+  uint8_t reg;
+  uint64_t delay_time : 40;
+}
 
 int spi_init(struct spi_bus * const bus);
 
@@ -276,12 +296,40 @@ void sys_mask_init(struct system_mask *mask);
 
 void send_message(struct spi_bus *bus, struct system_control *ctrl);
 
+void send_message_delay(struct spi_bus *bus, struct system_contol *ctrl,
+  uint64_t delay_time);
+
 void wait_for_msg(struct spi_bus *bus, struct system_control *ctrl);
+
+void wait_for_msg_int(
+  struct spi_bus *bus, 
+  struct system_control *ctrl,
+  struct system_status *sta);
+
+void load_microcode(struct spi_bus *bus); 
 
 void clear_status(struct spi_bus *bus, struct system_status *sta);
 
+void ranging_send(
+  struct spi_bus *bus, 
+  struct system_control *ctrl,
+  struct system_status *sta,
+  struct tx_buffer tx_buff);
+
+void ranging_recv(
+  struct spi_bus *bus,
+  struct ststem_control *ctrl,
+  struct system_staus *sta,
+  struct tx_buffer tx_buff);
+
+void gpio_interrupt();
+
+uint64_t compute_timestamp(uint64_t curr_time, uint64_t delay_time);
+
+int get_rx_data(struct spi_bus *bus, struct rx_data *data);
+
 int write_spi_msg(struct spi_bus *bus,
-                  unsigned char * const rx,
+                  void * const rx,
                   const void * const tx,
                   int len);
 
