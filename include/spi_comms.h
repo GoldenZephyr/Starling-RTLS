@@ -50,7 +50,12 @@
 #define DX_TIME_REG 0x0A
 #define DX_TIME_LEN 5
 
-#define INTERRUPT_PIN 3 //TODO: REVISE THIS
+#define SYS_TIME_REG 0x06
+#define SYS_TIME_LEN 6
+
+#define INTERRUPT_PIN_1 2 //TODO: REVISE THIS
+#define INTERRUPT_PIN_2 3 //TODO: REVISE THIS
+#define T_REPLY 0xEE0980000 //1 SECOND TODO: Derive good number
 
 struct spi_bus {
   const char *interface_name;
@@ -275,7 +280,12 @@ struct __attribute__((__packed__)) rx_data {
 struct __attribute__((__packed__)) dx_time {
   uint8_t reg;
   uint64_t delay_time : 40;
-}
+};
+
+struct __attribute__((__packed__)) sys_time {
+  uint8_t reg;
+  uint64_t curr_time : 40;
+};
 
 int spi_init(struct spi_bus * const bus);
 
@@ -292,19 +302,20 @@ void sys_conf_init(struct system_conf *conf);
 
 void sys_ctrl_init(struct system_control *ctrl);
 
-void sys_mask_init(struct system_mask *mask);
+void sys_mask_init(struct spi_bus *bus, struct system_mask *mask);
 
 void send_message(struct spi_bus *bus, struct system_control *ctrl);
 
-void send_message_delay(struct spi_bus *bus, struct system_contol *ctrl,
-  uint64_t delay_time);
+void send_message_delay(struct spi_bus *bus, struct system_control *ctrl,
+  struct dx_time *delay_time);
 
 void wait_for_msg(struct spi_bus *bus, struct system_control *ctrl);
 
 void wait_for_msg_int(
   struct spi_bus *bus, 
   struct system_control *ctrl,
-  struct system_status *sta);
+  struct system_status *sta,
+  int interrupt_pin);
 
 void load_microcode(struct spi_bus *bus); 
 
@@ -314,15 +325,17 @@ void ranging_send(
   struct spi_bus *bus, 
   struct system_control *ctrl,
   struct system_status *sta,
-  struct tx_buffer tx_buff);
+  struct tx_buffer *tx_buff,
+  int interrupt_pin);
 
 void ranging_recv(
   struct spi_bus *bus,
-  struct ststem_control *ctrl,
-  struct system_staus *sta,
-  struct tx_buffer tx_buff);
+  struct system_control *ctrl,
+  struct system_status *sta,
+  struct tx_buffer *tx_buff,
+  int interrupt_pin);
 
-void gpio_interrupt();
+void gpio_interrupt(void);
 
 uint64_t compute_timestamp(uint64_t curr_time, uint64_t delay_time);
 

@@ -5,6 +5,8 @@
 #include <linux/spi/spidev.h>
 #include <time.h>
 #include <string.h>
+#include <wiringPi.h>
+#include <signal.h>
 
 #include "spi_comms.h"
 #define STDOUT_FD 1
@@ -115,11 +117,12 @@ void sys_conf_init(struct system_conf *conf) {
 }
 
 //Interrupt GPIO Mask (Masked = Will show)
-void system_mask_init(struct system_mask *mask) {
+void sys_mask_init(struct spi_bus *bus, struct system_mask *mask) {
+  memset(mask, 0x00, sizeof(struct system_mask));
   mask->reg = SYS_MASK_REG | WRITE;
-  mask->mcplock = 0; //Mask Clock PLL Lock - No
-  mask->mesyncr = 0; //Mask External Sync Clock Reset - No
-  mask->maat = 0; //Mask Auto-Ack - No
+  mask->mrxdfr = 0x01; //Mask Data Frame Ready
+  char mask_rx[SYS_MASK_LEN];
+  write_spi_msg(bus, mask_rx, mask, SYS_MASK_LEN);
 }
 
 void send_message(struct spi_bus *bus, struct system_control *ctrl) {
@@ -134,8 +137,8 @@ void send_message(struct spi_bus *bus, struct system_control *ctrl) {
 void send_message_delay(struct spi_bus *bus, struct system_control *ctrl,
   struct dx_time *delay_time) {
   //Write in delay time
-  delay_time->reg = DX_TIME_REG | WRITE;
   char rx_dx_time[DX_TIME_LEN] = {0x00};
+  delay_time->reg = DX_TIME_REG | WRITE;
   write_spi_msg(bus, rx_dx_time, delay_time, DX_TIME_LEN);
   //Setup System Control to send 
   sys_ctrl_init(ctrl); 
@@ -172,7 +175,7 @@ void load_microcode(struct spi_bus *bus) {
 }
 
 void wait_for_msg_int(struct spi_bus *bus, struct system_control *ctrl,
-  struct system_staus *sta) {
+  struct system_status *sta, int interrupt_pin) {
   //Clear Status Reg
   clear_status(bus, sta);
   //Turn on receiver
@@ -181,7 +184,7 @@ void wait_for_msg_int(struct spi_bus *bus, struct system_control *ctrl,
   ctrl->rxenab = 0x01;
   write_spi_msg(bus, rx_sys_ctrl, ctrl, SYS_CTRL_LEN); //RECEIVER ON
   //Wait for GPIO Interrpt
-  wiringPilSR(INTERRUPT_PIN, INT_EDGE_RISING, gpio_interrput);
+  wiringPiISR(interrupt_pin, INT_EDGE_FALLING, gpio_interrupt);
   //Wait for Interrupt
   while(interrupt_flag == 0) {};
   //Clear Flag
@@ -214,7 +217,6 @@ void wait_for_msg(struct spi_bus * bus, struct system_control *ctrl) {
 
   unsigned char rx_buffer_tx[RX_BUFFER_LEN] = {0x00};
   rx_buffer_tx[0] = RX_BUFFER_REG;
-  unsigned char rx_buffer_rx[RX_BUFFER_LEN] = {0x00};
   
   while (1) {
     tx_status[0] = SYS_STATUS_REG;
@@ -227,9 +229,11 @@ void wait_for_msg(struct spi_bus * bus, struct system_control *ctrl) {
       //Clear Status Pin
       clear_status(bus, &sta);
       //Get Message
-      write_spi_msg(bus, rx_buffer_rx, rx_buffer_tx, RX_BUFFER_LEN);
+      struct rx_buffer recv_buff;
+      write_spi_msg(bus, &recv_buff, rx_buffer_tx, RX_BUFFER_LEN);
       //Write Message to stdout
-      write(STDOUT_FD, rx_buffer_rx, sizeof(rx_buffer_rx));
+      write(STDOUT_FD, recv_buff.payload, PAYLOAD_LEN);
+      break;
     }
     nanosleep(&slptime, NULL);
   }
@@ -323,19 +327,62 @@ int decawave_comms_init(struct spi_bus * const bus, const uint16_t pan_id,
 }
 
 void ranging_send(struct spi_bus * bus, struct system_control *ctrl,
-  struct system_status *sta, struct tx_buffer *tx_buff) {
- (void) bus; 
- (void) ctrl;
- (void) sta;
- (void) tx_buff;
+  struct system_status *sta, struct tx_buffer *tx_buff, int interrupt_pin) {
+  //Get current time, determine initial sending time
+  struct sys_time curr_time = {0x00};
+  unsigned char tx_sys_time[SYS_TIME_LEN] = {0x00};
+  tx_sys_time[0] = SYS_TIME_REG;
+  write_spi_msg(bus, &curr_time, tx_sys_time, SYS_TIME_LEN);
+  uint64_t timestamp_tx_1 = compute_timestamp(curr_time.curr_time, T_REPLY);
+  //Put timestamp into buffer
+  struct dx_time delay_time;  
+  delay_time.reg = DX_TIME_REG | WRITE;
+  delay_time.delay_time = timestamp_tx_1;
+  tx_buff->timestamp = timestamp_tx_1;
+  //Write in new buffer
+  char buff_rx[TX_BUFFER_LEN];
+  write_spi_msg(bus, buff_rx, tx_buff, TX_BUFFER_LEN);
+  printf("Ok, I will intialize the ranging at time %llu\n", timestamp_tx_1);
+  //Send Message
+    send_message_delay(bus, ctrl, &delay_time);
+    //Go into recieve moce - Wait for Message
+    printf("Sent message, waiting for reply...\n");
+    wait_for_msg_int(bus, ctrl, sta, interrupt_pin);
+    //Grab Info
+    printf("Got message, grabbing data...\n");
+    struct rx_data data;
+    get_rx_data(bus, &data);
+    //Get Timestamp
+    uint64_t timestamp_rx_2 = data.timestamp.rx_stamp; //Lower 40 Bits
+    //Get TX Timestamp
+    uint64_t timestamp_rx_1 = data.buffer.timestamp;
+    //Compute Next Send Time
+    uint64_t timestamp_tx_3 = compute_timestamp(timestamp_rx_1, T_REPLY);
+    //Compose Response
+    printf("I got the response at %llu, which says the other device"
+      " got my message at %llu, I will reply at %llu\n",
+      timestamp_rx_2,
+      timestamp_rx_1,
+      timestamp_tx_3);
+    delay_time.delay_time = timestamp_tx_3;
+    tx_buff->timestamp = timestamp_tx_3;
+  //Write in new buffer
+  write_spi_msg(bus, buff_rx, tx_buff, TX_BUFFER_LEN);
+  //Send Message
+  send_message_delay(bus, ctrl, &delay_time);
+  printf("Message will be sent, I am done\n");
+  //TODO: Propogation Logic
+  (void) timestamp_rx_2;
 }
 
 void ranging_recv(struct spi_bus * bus, struct system_control *ctrl,
-  struct sysyem_status *sta, struct tx_buffer *tx_buff) {
+  struct system_status *sta, struct tx_buffer *tx_buff, int interrupt_pin) {
  //Go into recieve moce - Wait for Message
- wait_for_msg_int(bus, ctrl, sta);
+ printf("Ok, waiting for first message...\n");
+ wait_for_msg_int(bus, ctrl, sta, interrupt_pin);
+ printf("Got First Message, grabbing data...\n");
  //Grab Info
- struct rx_data data = {0x00};
+ struct rx_data data;
  get_rx_data(bus, &data);
  //Get Timestamp
  uint64_t timestamp_rx_1 = data.timestamp.rx_stamp; //Lower 40 Bits
@@ -343,32 +390,54 @@ void ranging_recv(struct spi_bus * bus, struct system_control *ctrl,
  uint64_t timestamp_tx_1 = data.buffer.timestamp;
  //Compute Next Send Time
  uint64_t timestamp_rx_2 = compute_timestamp(timestamp_rx_1, T_REPLY);
+ printf("Ok, got message at timestamp %llu, will send at %llu\n",
+  timestamp_rx_1, timestamp_tx_1);
+ 
  //Compose Response
  struct dx_time delay_time; 
- dx_time.delay_time = timestamp_rx_2;
- tx_buff->timestamp = timestamp_rx_2;
+ delay_time.reg = DX_TIME_REG | WRITE;
+ delay_time.delay_time = timestamp_rx_2;
+ tx_buff->timestamp = timestamp_rx_1;
  //Write in new buffer
  char buff_rx[TX_BUFFER_LEN];
  write_spi_msg(bus, buff_rx, tx_buff, TX_BUFFER_LEN);
  //Send Message
- send_message_delay(bus, ctrl, timestamp_rx_2);
+ send_message_delay(bus, ctrl, &delay_time);
+ printf("Sending packet containing timestamp %llu"
+  " at time %llu, now waiting for response\n",
+  timestamp_rx_1,
+  timestamp_rx_2);
  //Wait for Response
- wait_for_msg_int(bus, ctrl, sta);
+ wait_for_msg_int(bus, ctrl, sta, interrupt_pin);
  //Grab Info
- struct rx_data data2 = {0x00};
+ printf("Got third message, grabbing data...\n");
+ struct rx_data data2;
  get_rx_data(bus, &data2);
  //Get Timestamp
  uint64_t timestamp_rx_3 = data2.timestamp.rx_stamp; //Lower 40 Bits
  //Get TX Timestamp
  uint64_t timestamp_tx_3 = data2.buffer.timestamp;
  //TODO: Propogation Logic
+ printf("The other device got my message at %llu,"
+  " I recieved its message at  %llu\n",
+  timestamp_tx_3,
+  timestamp_rx_3);
+ printf("I am done\n");
 }
 
 uint64_t compute_timestamp(uint64_t curr_time, uint64_t delay_time) {
+  printf("The Current time is %llu\n", curr_time);
+  printf("We want to delay by %llu\n", delay_time);
   uint64_t sum_time = curr_time + delay_time;
   //Wrap around if we overflow
-  return (sum_time > 0xFFFFFFFFFF) ? 
-    delay_time - (0xFFFFFFFFFF - sum_time) : sum_time;
+  if (sum_time > 0xFFFFFFFFFF) {
+    uint64_t wrap_time = delay_time - (0xFFFFFFFFFF - sum_time);
+    printf("Overflow, using time %llu instead\n", wrap_time);
+    return wrap_time;
+  } else {
+   printf("No overflow, using time as is\n");
+   return sum_time;
+  }
 }
 
 int write_payload(struct spi_bus * const bus,
@@ -397,9 +466,9 @@ int get_rx_data(struct spi_bus *bus, struct rx_data *data) {
   char tx_buffer[TX_BUFFER_LEN] = {0x00};
   tx_buffer[0] = RX_BUFFER_REG;
   //Write Data Into Structs
-  write_spi_msg(bus, &data->finfo, tx_finfo, RX_FINFO_LEN);
-  write_spi_msg(bus, &data->timestamp, tx_timestamp, RX_TIME_LEN);
-  write_spi_msg(bus, &data->buffer, tx_buffer, RX_BUFFER_LEN);
+  write_spi_msg(bus, &(data->finfo), tx_finfo, RX_FINFO_LEN);
+  write_spi_msg(bus, &(data->timestamp), tx_timestamp, RX_TIME_LEN);
+  write_spi_msg(bus, &(data->buffer), tx_buffer, RX_BUFFER_LEN);
   return 0;
 }
 
