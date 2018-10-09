@@ -67,8 +67,9 @@ int main() {
     exit(EXIT_FAILURE);
   }
   //Determine Interrupt Pin
-  printf("Select Interrupt Pin (BCM)");
+  printf("Select Interrupt Pin (BCM)\n");
   ret = fgets(sel, sizeof(sel), stdin);
+  printf("Ok, using interrupt pin %d\n", atoi(sel));
   int interrupt_pin = atoi(sel);
 
 

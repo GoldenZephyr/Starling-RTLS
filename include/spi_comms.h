@@ -53,9 +53,7 @@
 #define SYS_TIME_REG 0x06
 #define SYS_TIME_LEN 6
 
-#define INTERRUPT_PIN_1 2 //TODO: REVISE THIS
-#define INTERRUPT_PIN_2 3 //TODO: REVISE THIS
-#define T_REPLY 0xEE0980000 //1 SECOND TODO: Derive good number
+#define T_REPLY 0x17CDC0000 //100 ms
 
 struct spi_bus {
   const char *interface_name;
@@ -307,7 +305,7 @@ void sys_mask_init(struct spi_bus *bus, struct system_mask *mask);
 void send_message(struct spi_bus *bus, struct system_control *ctrl);
 
 void send_message_delay(struct spi_bus *bus, struct system_control *ctrl,
-  struct dx_time *delay_time);
+  struct dx_time *delay_time, int reenb_transmitter);
 
 void wait_for_msg(struct spi_bus *bus, struct system_control *ctrl);
 
