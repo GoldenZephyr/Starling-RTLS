@@ -27,10 +27,10 @@
 #define PAYLOAD_LEN 64
 
 #define TX_BUFFER_REG 0x09
-#define TX_BUFFER_LEN PAYLOAD_LEN + 12 + 5
+#define TX_BUFFER_LEN sizeof(struct tx_buffer)
 
 #define RX_BUFFER_REG 0x11
-#define RX_BUFFER_LEN PAYLOAD_LEN + 12 + 5 //Payload/Reg+Header/Timestamp
+#define RX_BUFFER_LEN sizeof(struct rx_buffer)
 
 #define RX_FINFO_REG 0x10
 #define RX_FINFO_LEN 5
@@ -56,7 +56,9 @@
 #define EC_CTRL_REG 0x24
 #define EC_CTRL_LEN 5
 
-#define T_REPLY (uint64_t) 128*499200000 / 10 //100 ms
+#define LIGHT_SPEED 299792458
+#define CLOCK_FREQ 128*499200000
+#define T_REPLY (uint64_t) CLOCK_FREQ/100 //10 ms
 
 struct spi_bus {
   const char *interface_name;
@@ -113,7 +115,7 @@ struct __attribute__((__packed__)) mac_header {
 struct __attribute__((__packed__)) tx_buffer {
   uint8_t reg;
   struct mac_header mac_header;
-  uint64_t timestamp : 40;
+  uint64_t timestamp_tx : 40;
   uint8_t payload[PAYLOAD_LEN]; //TODO: Longer? 64 Bytes
 };
 
@@ -267,7 +269,7 @@ struct __attribute__((__packed__)) rx_time {
 struct __attribute__((__packed__)) rx_buffer { //Yeah it's tx_buffer...
   uint8_t reg;
   struct mac_header mac_header;
-  uint64_t timestamp : 40;
+  uint64_t timestamp_tx : 40;
   uint8_t payload[PAYLOAD_LEN];
 };
 
@@ -350,7 +352,9 @@ void ranging_recv(
 
 void gpio_interrupt(void);
 
-uint64_t compute_timestamp(uint64_t curr_time, uint64_t delay_time);
+uint64_t time_add(uint64_t curr_time, uint64_t delay_time);
+
+uint64_t time_sub(uint64_t t_larger, uint64_t t_smaller);
 
 int get_rx_data(struct spi_bus *bus, struct rx_data *data);
 

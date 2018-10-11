@@ -4,6 +4,8 @@ CC = gcc
 CCFLAGS = -Wall -Werror -Wextra -pedantic -O3 -std=gnu99
 INCLUDE = include
 INC_WIRINGPI = wiringPi
+DEBUG = DEBUG
+
 
 SINGLE_MESSAGE_DEPENDS = source/single_message.c source/spi_utils.c
 RANGING_DEPENDS = source/ranging.c source/spi_utils.c
@@ -23,7 +25,7 @@ ranging: $(RANGING_DEPENDS)
 	$(CC) $(CCFLAGS) $^ -I$(INCLUDE) -l$(INC_WIRINGPI) -o bin/$@
 
 ranging_debug: $(RANGING_DEPENDS)
-	$(CC) $(CCFLAGS) -Og -g $^ -I$(INCLUDE) -l$(INC_WIRINGPI) -o bin/$@
+	$(CC) $(CCFLAGS) -Og -g $^ -I$(INCLUDE) -l$(INC_WIRINGPI) -D$(DEBUG) -o bin/$@
 
 ranging_small: $(RANGING_DEPENDS)
 	$(CC) $(CCFLAGS) -Os $^ -I$(INCLUDE) -l$(INC_WIRINGPI) -o bin/$@
