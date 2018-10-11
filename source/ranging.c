@@ -55,6 +55,24 @@ int main() {
     exit(EXIT_FAILURE);
   } 
   sys_ctrl_init(&sys_ctrl);
+  //Set Pll
+  set_pll(&bus0);
+
+
+  //Check System Status
+  struct system_status sta;
+  char tx_status[SYS_STATUS_LEN] = {0x00};
+  char rx_status[SYS_STATUS_LEN] = {0x00};
+  tx_status[0] = SYS_STATUS_REG;
+  write_spi_msg(&bus0, &sta, tx_status, SYS_STATUS_LEN);
+  memcpy(rx_status, &sta, sizeof(struct system_status));
+  printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n", rx_status[1],
+    rx_status[2], rx_status[3], rx_status[4], rx_status[5]);
+  clear_status(&bus0, &sta);
+  write_spi_msg(&bus0, &sta, tx_status, SYS_STATUS_LEN);
+  memcpy(rx_status, &sta, sizeof(struct system_status));
+  printf("0x%02X 0x%02X 0x%02X 0x%02X 0x%02X\n", rx_status[1],
+    rx_status[2], rx_status[3], rx_status[4], rx_status[5]);
 
   //Setup tx_fctrl  
   struct tx_fctrl fctrl;
@@ -67,11 +85,13 @@ int main() {
     exit(EXIT_FAILURE);
   }
   //Determine Interrupt Pin
+  /*
   printf("Select Interrupt Pin (BCM)\n");
   ret = fgets(sel, sizeof(sel), stdin);
   printf("Ok, using interrupt pin %d\n", atoi(sel));
   int interrupt_pin = atoi(sel);
-
+  */
+  int interrupt_pin = 0;
 
   //Determine Mode
   printf("Mode: 1 for initial sender | 0 for receiver\n");
@@ -90,7 +110,6 @@ int main() {
   
   //Load microcode
   load_microcode(&bus0);
-  struct system_status sta;
   //Interrupt Mask
   struct system_mask mask;
   sys_mask_init(&bus0, &mask);

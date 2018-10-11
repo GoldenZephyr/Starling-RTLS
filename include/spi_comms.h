@@ -48,12 +48,15 @@
 #define SYS_STATUS_LEN 6
 
 #define DX_TIME_REG 0x0A
-#define DX_TIME_LEN 5
+#define DX_TIME_LEN 6
 
 #define SYS_TIME_REG 0x06
 #define SYS_TIME_LEN 6
 
-#define T_REPLY 0x17CDC0000 //100 ms
+#define EC_CTRL_REG 0x24
+#define EC_CTRL_LEN 5
+
+#define T_REPLY (uint64_t) 128*499200000 / 10 //100 ms
 
 struct spi_bus {
   const char *interface_name;
@@ -285,6 +288,16 @@ struct __attribute__((__packed__)) sys_time {
   uint64_t curr_time : 40;
 };
 
+struct __attribute__((__packed__)) ec_ctrl {
+  uint8_t reg;
+  unsigned int ostsm : 1;
+  unsigned int osrsm : 1;
+  unsigned int pllldt : 1;
+  unsigned int wait : 8;
+  unsigned int ostrm : 1;
+  unsigned int res : 20;
+};
+
 int spi_init(struct spi_bus * const bus);
 
 int comms_check(struct spi_bus * const bus);
@@ -306,6 +319,8 @@ void send_message(struct spi_bus *bus, struct system_control *ctrl);
 
 void send_message_delay(struct spi_bus *bus, struct system_control *ctrl,
   struct dx_time *delay_time, int reenb_transmitter);
+
+void set_pll(struct spi_bus *bus);
 
 void wait_for_msg(struct spi_bus *bus, struct system_control *ctrl);
 

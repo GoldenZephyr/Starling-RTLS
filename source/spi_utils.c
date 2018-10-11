@@ -151,6 +151,19 @@ void send_message_delay(struct spi_bus *bus, struct system_control *ctrl,
   return;
 }
 
+void set_pll(struct spi_bus *bus) {
+  struct ec_ctrl pll_ctrl;
+  pll_ctrl.reg = EC_CTRL_REG | WRITE;
+  pll_ctrl.ostsm = 0x00;
+  pll_ctrl.osrsm = 0x00;
+  pll_ctrl.pllldt = 0x01; //Set
+  pll_ctrl.wait = 0x00;
+  pll_ctrl.ostrm = 0x00;
+  pll_ctrl.res = 0x00;
+  char ec_ctrl_rx[EC_CTRL_LEN];
+  write_spi_msg(bus, ec_ctrl_rx, &pll_ctrl, EC_CTRL_LEN);
+}
+
 void load_microcode(struct spi_bus *bus) {
   struct timespec slptime;
   slptime.tv_sec = 0;
@@ -178,21 +191,45 @@ void load_microcode(struct spi_bus *bus) {
 
 void wait_for_msg_int(struct spi_bus *bus, struct system_control *ctrl,
   struct system_status *sta, int interrupt_pin) {
-  //Clear Status Reg
+  //Clear Status Reg  
   clear_status(bus, sta);
+
+  struct timespec slptime;
+  slptime.tv_sec = 0;
+  slptime.tv_nsec = 200000000;
+  
   //Turn on receiver
   sys_ctrl_init(ctrl); 
   unsigned char rx_sys_ctrl[SYS_CTRL_LEN] = {0x00};
   ctrl->rxenab = 0x01;
   write_spi_msg(bus, rx_sys_ctrl, ctrl, SYS_CTRL_LEN); //RECEIVER ON
+  
   //Wait for GPIO Interrpt
+  //TODO: Interrupt, for now we will poll
+  unsigned char tx_status[SYS_STATUS_LEN] = {0x00};
+//unsigned char rx_status[SYS_STATUS_LEN] = {0x00};
+  tx_status[0] = SYS_STATUS_REG;
+  while (1) {
+    write_spi_msg(bus, sta, tx_status, SYS_STATUS_LEN); 
+//    memcpy(rx_status, sta, SYS_STATUS_LEN);
+//    printf("0x%02X 0x%02X 0x%02X 0x%02X\n", rx_status[1]
+//    ,rx_status[2], rx_status[3], rx_status[4]);
+    if (sta->rxdfr) {  //Check Data Ready Status 
+      //Clear Status Pin
+      clear_status(bus, sta);
+      break;
+    }
+    nanosleep(&slptime, NULL);
+  }
+
+  /*
   wiringPiISR(interrupt_pin, INT_EDGE_RISING, gpio_interrupt);
   //Wait for Interrupt
   while(interrupt_flag == 0) {};
   //Clear Flag
   interrupt_flag = 0;
-  //Clear Status Reg
-  clear_status(bus, sta);
+  */
+  (void) interrupt_pin;
 }
 
 void wait_for_msg(struct spi_bus * bus, struct system_control *ctrl) {
@@ -262,7 +299,7 @@ int spi_init(struct spi_bus *bus) {
     perror("Failed to open spidev");
     return 1;
   }
-  bus->xfer->speed_hz = 2000000;
+  bus->xfer->speed_hz = 2000000; //2Mhz
   bus->xfer->bits_per_word = 8;
   bus->xfer->delay_usecs = 0;
   bus->xfer->cs_change = 0;
@@ -331,10 +368,17 @@ int decawave_comms_init(struct spi_bus * const bus, const uint16_t pan_id,
 void ranging_send(struct spi_bus * bus, struct system_control *ctrl,
   struct system_status *sta, struct tx_buffer *tx_buff, int interrupt_pin) {
   //Get current time, determine initial sending time
+  //struct timespec slptime;
+  //slptime.tv_sec = 1;
+  //slptime.tv_nsec = 0; 
   struct sys_time curr_time = {0x00};
   unsigned char tx_sys_time[SYS_TIME_LEN] = {0x00};
   tx_sys_time[0] = SYS_TIME_REG;
   write_spi_msg(bus, &curr_time, tx_sys_time, SYS_TIME_LEN);
+  //uint64_t time = curr_time.curr_time;
+  //printf("%llu\n", time);
+  //nanosleep(&slptime, NULL);
+  //}
   uint64_t timestamp_tx_1 = compute_timestamp(curr_time.curr_time, T_REPLY);
   //Put timestamp into buffer
   struct dx_time delay_time;  
@@ -434,7 +478,8 @@ uint64_t compute_timestamp(uint64_t curr_time, uint64_t delay_time) {
   //Wrap around if we overflow
   if (sum_time > 0xFFFFFFFFFF) {
     uint64_t wrap_time = delay_time - (0xFFFFFFFFFF - sum_time);
-    //printf("Overflow, using time %llu instead\n", wrap_time);
+    printf("OVERFLOW, %llu + %llu wraps to %llu\n", curr_time, delay_time,
+      wrap_time);
     return wrap_time;
   } else {
    //printf("No overflow, using time as is\n");
@@ -501,8 +546,8 @@ void clear_status(struct spi_bus *bus, struct system_status *sta) {
   sta->rxpto = 1;
   sta->gpioirq = 1;
   sta->slpinit = 0;
-  sta->rfpll = 0;
-  sta->clkpll = 0;
+  sta->rfpll = 1;
+  sta->clkpll = 1;
   sta->rxsfdto = 1;
   sta->hpdwarn = 0;
   sta->txberr = 1;
