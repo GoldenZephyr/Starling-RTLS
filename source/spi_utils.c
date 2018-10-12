@@ -486,8 +486,8 @@
  uint64_t t_round1 = time_sub(timestamp_rx_2, timestamp_tx_1);
  uint64_t t_round2 = time_sub(timestamp_rx_3, timestamp_tx_2);
  printf("The other device will compute tprop of %llu\n", (t_round1 - T_REPLY) / 2);
- uint64_t t_prop = (t_round2 - T_REPLY) / 2;
- printf("I compute a tprop of %llu clock cycles\n",t_prop);
+ double t_prop = ((double)t_round1 * (double)t_round2 - (double)T_REPLY*(double)T_REPLY) / ((double)t_round1 + (double)t_round2 + (double)T_REPLY + (double)T_REPLY);
+ printf("I compute a tprop of %f clock cycles\n",t_prop);
  double prop_in_secs = ((double) t_prop) / ((double) CLOCK_FREQ);
  printf("So the distance is %f meters", prop_in_secs * LIGHT_SPEED);
 }
