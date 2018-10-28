@@ -198,11 +198,11 @@
   void wait_for_msg_int(struct spi_bus *bus, struct system_control *ctrl,
     struct system_status *sta, int interrupt_pin) {
     //Clear Status Reg  
-    clear_status(bus, sta);
+    //clear_status(bus, sta);
 
     struct timespec slptime;
     slptime.tv_sec = 0;
-    slptime.tv_nsec = 5000;
+    slptime.tv_nsec = 10000;
     
     //Turn on receiver
     sys_ctrl_init(ctrl); 
@@ -493,7 +493,7 @@
   info->timestamp_rx_3 = data2.timestamp.rx_stamp; //Lower 40 Bits
   //Get TX Timestamp
   info->timestamp_tx_3 = data2.buffer.timestamp_tx;
-  info->timestamp_rx_2 = time_sub(info->timestamp_tx_2, T_REPLY);
+  info->timestamp_rx_2 = time_sub(info->timestamp_tx_3, T_REPLY);
   //debug_print("The other device sent it's message at %llu,"
   //" I received its message at %llu\n",
   //timestamp_tx_3,

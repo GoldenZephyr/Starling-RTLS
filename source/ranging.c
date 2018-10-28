@@ -140,7 +140,6 @@ int main() {
      double prop_in_secs = ((double) t_prop) / ((double) CLOCK_FREQ);
      printf("So the distance is %f meters\n", prop_in_secs * LIGHT_SPEED);
   }
-  reset_trx(&bus0, &sys_ctrl);
  }
  return 0;
 
