@@ -382,13 +382,13 @@
     write_spi_msg(bus, &curr_time, tx_sys_time, SYS_TIME_LEN);
     
     //Determine intial sending time
-    info->timestamp_tx_1 = time_add(curr_time.curr_time, T_REPLY);
+    uint64_t timestamp_tx_1 = time_add(curr_time.curr_time, T_REPLY);
     
     //Put timestamp into delayed sending buffer & payload structs
     struct dx_time delay_time;  
     delay_time.reg = DX_TIME_REG | WRITE;
-    delay_time.delay_time = info->timestamp_tx_1;
-    tx_buff->timestamp_tx = info->timestamp_tx_1;
+    delay_time.delay_time = timestamp_tx_1;
+    tx_buff->timestamp_tx = timestamp_tx_1;
     
     //SPI Write in new buffer
     char buff_rx[TX_BUFFER_LEN];
@@ -409,19 +409,19 @@
     get_rx_data(bus, &data);
     
     //RX Timestamp (When we got it's reply)
-    info->timestamp_rx_2 = data.timestamp.rx_stamp; //Lower 40 Bits
+    uint64_t timestamp_rx_2 = data.timestamp.rx_stamp; //Lower 40 Bits
     
     //TX Timestamp (When it sent it's message)
-    info->timestamp_tx_2 = data.buffer.timestamp_tx;
+    uint64_t timestamp_tx_2 = data.buffer.timestamp_tx;
     //Compute RX Timestamp (When it got our message)
-    info->timestamp_rx_1 = time_sub(info->timestamp_tx_2, T_REPLY);
+    info->timestamp_rx_1 = time_sub(timestamp_tx_2, T_REPLY);
 
     //Compute Next Send Time
-    info->timestamp_tx_3 = time_add(info->timestamp_rx_2, T_REPLY);
+    uint64_t timestamp_tx_3 = time_add(timestamp_rx_2, T_REPLY);
     
     //Compose Response
-    delay_time.delay_time = info->timestamp_tx_3;
-    tx_buff->timestamp_tx = info->timestamp_tx_3;
+    delay_time.delay_time = timestamp_tx_3;
+    tx_buff->timestamp_tx = timestamp_tx_3;
     
     //Write in new buffer
     write_spi_msg(bus, buff_rx, tx_buff, TX_BUFFER_LEN);
@@ -429,7 +429,10 @@
     //Send Message
     send_message_delay(bus, ctrl, &delay_time, 0);
     //debug_print("Message will be sent, I am done\n");
-    
+    info->timestamp_tx_1 = timestamp_tx_1;
+    info->timestamp_tx_2 = timestamp_tx_2;
+    info->timestamp_rx_2 = timestamp_rx_2;
+    info->timestamp_tx_3 = timestamp_tx_3;
     //TODO: Propogation Logic
     /*
     uint64_t t_round1 = time_sub(timestamp_rx_2, timestamp_tx_1);
