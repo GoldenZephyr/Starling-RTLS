@@ -291,12 +291,12 @@ struct __attribute__((__packed__)) sys_time {
 };
 
 struct __attribute__((__packed__)) range_info {
-  uint64_t timestamp_tx_1;
-  uint64_t timestamp_rx_1;
-  uint64_t timestamp_tx_2;
-  uint64_t timestamp_rx_2;
-  uint64_t timestamp_tx_3;
-  uint64_t timestamp_rx_3;
+  uint64_t timestamp_tx_1 : 40;
+  uint64_t timestamp_rx_1 : 40;
+  uint64_t timestamp_tx_2 : 40;
+  uint64_t timestamp_rx_2 : 40;
+  uint64_t timestamp_tx_3 : 40;
+  uint64_t timestamp_rx_3 : 40;
 };
 
 struct __attribute__((__packed__)) ec_ctrl {

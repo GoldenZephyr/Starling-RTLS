@@ -130,7 +130,7 @@ int main() {
      double t_prop = ((double)t_round1 * (double)t_round2 - (double)T_REPLY*(double)T_REPLY) / ((double)t_round1 + (double)t_round2 + (double)T_REPLY + (double)T_REPLY);
      printf("I compute a tprop of %f clock cycles\n", t_prop);
      double prop_in_secs = ((double) t_prop) / ((double) CLOCK_FREQ);
-     printf("So the distance is %f meters", prop_in_secs * LIGHT_SPEED);
+     printf("So the distance is %f meters\n", prop_in_secs * LIGHT_SPEED);
    } else if (tx_buff.payload[0] == '1') { //Transmit Message
      reset_trx(&bus0, &sys_ctrl);
      ranging_send(&bus0, &sys_ctrl, &sta, &tx_buff, &info, interrupt_pin); 
@@ -138,7 +138,7 @@ int main() {
      uint64_t t_prop = (t_round1 - T_REPLY) / 2;
      printf("I compute a tProp of %llu clock cycles\n", t_prop);
      double prop_in_secs = ((double) t_prop) / ((double) CLOCK_FREQ);
-     printf("So the distance is %f meters", prop_in_secs * LIGHT_SPEED);
+     printf("So the distance is %f meters\n", prop_in_secs * LIGHT_SPEED);
   }
   reset_trx(&bus0, &sys_ctrl);
  }
