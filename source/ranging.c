@@ -99,6 +99,11 @@ int main() {
   //Interrupt Mask
   struct system_mask mask;
   sys_mask_init(&bus0, &mask);
+ 
+
+  struct timespec slptime;
+  slptime.tv_sec = 0;
+  slptime.tv_nsec = 500000000; //0.5 sec
   
   while(1) {
    //Determine Mode
@@ -121,17 +126,33 @@ int main() {
    memset(&info, 0x00, sizeof(struct range_info));
    //Check Mode
    if (tx_buff.payload[0] == '0') {
+     slptime.tv_nsec = 100000000; //0.5 sec
+     while (1) {
      printf("Waiting for msg...\n");
      reset_trx(&bus0, &sys_ctrl);
      ranging_recv(&bus0, &sys_ctrl, &sta, &tx_buff, &info, interrupt_pin);
      //Propogation Logic
+     /*
      uint64_t t_round1 = time_sub(info.timestamp_rx_2, info.timestamp_tx_1);
      uint64_t t_round2 = time_sub(info.timestamp_rx_3, info.timestamp_tx_2);
      double t_prop = ((double)t_round1 * (double)t_round2 - (double)T_REPLY*(double)T_REPLY) / ((double)t_round1 + (double)t_round2 + (double)T_REPLY + (double)T_REPLY);
      printf("I compute a tprop of %f clock cycles\n", t_prop);
      double prop_in_secs = ((double) t_prop) / ((double) CLOCK_FREQ);
      printf("So the distance is %f meters\n", prop_in_secs * LIGHT_SPEED);
+     */
+     printf("%llu, %llu, %llu, %llu, %llu, %llu, %d, %d, %d, %d, %u, %u, %u %u %u %u %u %u %u %u %u %u %u %u\n",
+     (uint64_t) info.timestamp_tx_1, (uint64_t) info.timestamp_rx_1,
+     (uint64_t) info.timestamp_tx_2, (uint64_t) info.timestamp_rx_2,
+     (uint64_t) info.timestamp_tx_3, (uint64_t) info.timestamp_rx_3,
+     info.fp_ampl1_rx_1, info.fp_ampl1_rx_2, info.fp_ampl1_rx_3,
+     info.rxpacc_rx_1, info.rxpacc_rx_2, info.rxpacc_rx_3, 
+     info.rx_fqual_1.std_noise, info.rx_fqual_1.fp_ampl2, info.rx_fqual_1.pp_ampl3, info.rx_fqual_1.cir_pwr,
+     info.rx_fqual_2.std_noise, info.rx_fqual_2.fp_ampl2, info.rx_fqual_2.pp_ampl3, info.rx_fqual_2.cir_pwr,
+     info.rx_fqual_3.std_noise, info.rx_fqual_3.fp_ampl2, info.rx_fqual_3.pp_ampl3, info.rx_fqual_3.cir_pwr);
+     nanosleep(&slptime, NULL);
+     }
    } else if (tx_buff.payload[0] == '1') { //Transmit Message
+     while (1) {
      reset_trx(&bus0, &sys_ctrl);
      ranging_send(&bus0, &sys_ctrl, &sta, &tx_buff, &info, interrupt_pin); 
      uint64_t t_round1 = time_sub(info.timestamp_rx_2, info.timestamp_tx_1);
@@ -139,9 +160,9 @@ int main() {
      printf("I compute a tProp of %llu clock cycles\n", t_prop);
      double prop_in_secs = ((double) t_prop) / ((double) CLOCK_FREQ);
      printf("So the distance is %f meters\n", prop_in_secs * LIGHT_SPEED);
+     nanosleep(&slptime, NULL);
+     }
   }
  }
  return 0;
-
-
 }

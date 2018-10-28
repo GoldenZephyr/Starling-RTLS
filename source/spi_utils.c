@@ -472,7 +472,7 @@
    delay_time.delay_time = info->timestamp_tx_2;
    tx_buff->timestamp_tx = info->timestamp_tx_2;
    tx_buff->fp_ampl1 = data.timestamp.fp_ampl1;
-   tx_buff->rxpaxx_rx = data.finfo.rxpaxx;
+   tx_buff->rxpacc_rx = data.finfo.rxpacc;
    tx_buff->fqual = data.fqual;
 
    //Write in new buffer
@@ -503,7 +503,7 @@
   
   //Store RX info
   info->rx_fqual_2 = data2.buffer.fqual;
-  info->rx_fpampl1_rx_2 = data2.buffer.fp_ampl1;
+  info->fp_ampl1_rx_2 = data2.buffer.fp_ampl1;
   info->rxpacc_rx_2 = data2.buffer.rxpacc_rx;
   
   info->rx_fqual_3 = data2.fqual;

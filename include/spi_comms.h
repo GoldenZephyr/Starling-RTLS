@@ -91,6 +91,13 @@ struct __attribute__((packed)) tx_fctrl {
   unsigned int res_2 : 24;
 };
 
+struct __attribute__((__packed__)) rx_fqual {
+  uint8_t reg;
+  uint16_t std_noise;
+  uint16_t fp_ampl2;
+  uint16_t pp_ampl3;
+  uint16_t cir_pwr;
+};
 //Frame Control - 2 Bytes
 struct __attribute__((__packed__)) frame_control {
  unsigned int frame_type : 3;
@@ -272,6 +279,7 @@ struct __attribute__((__packed__)) rx_time {
   uint64_t rx_rawst : 40;
 };
 
+
 struct __attribute__((__packed__)) rx_buffer { //Yeah it's tx_buffer...
   uint8_t reg;
   struct mac_header mac_header;
@@ -283,12 +291,6 @@ struct __attribute__((__packed__)) rx_buffer { //Yeah it's tx_buffer...
 };
 
 
-struct __attribute__((__packed__)) rx_fqual {
-  uint16_t std_noise;
-  uint16_t fp_ampl2;
-  uint16_t pp_ampl3;
-  uint16_t cir_pwr;
-};
 
 //Wrapper Struct - Has all transmission RX information
 struct __attribute__((__packed__)) rx_data {
