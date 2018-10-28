@@ -290,6 +290,15 @@ struct __attribute__((__packed__)) sys_time {
   uint64_t curr_time : 40;
 };
 
+struct __attribute__((__packed__)) range_info {
+  uint64_t timestamp_tx_1;
+  uint64_t timestamp_rx_1;
+  uint64_t timestamp_tx_2;
+  uint64_t timestamp_rx_2;
+  uint64_t timestamp_tx_3;
+  uint64_t timestamp_rx_3;
+};
+
 struct __attribute__((__packed__)) ec_ctrl {
   uint8_t reg;
   unsigned int ostsm : 1;
@@ -341,6 +350,7 @@ void ranging_send(
   struct system_control *ctrl,
   struct system_status *sta,
   struct tx_buffer *tx_buff,
+  struct range_info *info,
   int interrupt_pin);
 
 void ranging_recv(
@@ -348,6 +358,7 @@ void ranging_recv(
   struct system_control *ctrl,
   struct system_status *sta,
   struct tx_buffer *tx_buff,
+  struct range_info *info,
   int interrupt_pin);
 
 void gpio_interrupt(void);

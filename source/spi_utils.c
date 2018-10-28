@@ -12,7 +12,7 @@
 #define STDOUT_FD 1
 
 #ifdef DEBUG
-#define debug_print(...) printf(...)
+#define debug_print(...) printf(__VA_ARGS__)
 #else
 #define debug_print(...)
 #endif
@@ -372,124 +372,141 @@
   }
 
   void ranging_send(struct spi_bus * bus, struct system_control *ctrl,
-    struct system_status *sta, struct tx_buffer *tx_buff, int interrupt_pin) {
-    //Get current time, determine initial sending time
-    //struct timespec slptime;
-    //slptime.tv_sec = 1;
-    //slptime.tv_nsec = 0; 
+    struct system_status *sta, struct tx_buffer *tx_buff, 
+    struct range_info *info, int interrupt_pin) {
+    
+    //Get current time
     struct sys_time curr_time = {0x00};
     unsigned char tx_sys_time[SYS_TIME_LEN] = {0x00};
     tx_sys_time[0] = SYS_TIME_REG;
     write_spi_msg(bus, &curr_time, tx_sys_time, SYS_TIME_LEN);
-    //uint64_t time = curr_time.curr_time;
-    //debug_print("%llu\n", time);
-    //nanosleep(&slptime, NULL);
-    //}
-    uint64_t timestamp_tx_1 = time_add(curr_time.curr_time, T_REPLY);
-    //Put timestamp into buffer
+    
+    //Determine intial sending time
+    info->timestamp_tx_1 = time_add(curr_time.curr_time, T_REPLY);
+    
+    //Put timestamp into delayed sending buffer & payload structs
     struct dx_time delay_time;  
     delay_time.reg = DX_TIME_REG | WRITE;
-    delay_time.delay_time = timestamp_tx_1;
-    tx_buff->timestamp_tx = timestamp_tx_1;
-    //Write in new buffer
+    delay_time.delay_time = info->timestamp_tx_1;
+    tx_buff->timestamp_tx = info->timestamp_tx_1;
+    
+    //SPI Write in new buffer
     char buff_rx[TX_BUFFER_LEN];
     write_spi_msg(bus, buff_rx, tx_buff, TX_BUFFER_LEN);
-    debug_print("Ok, I will intialize the ranging at time %llu\n", timestamp_tx_1);
-    //Send Message
+    //debug_print("Ok, I will intialize the ranging at time %llu\n", timestamp_tx_1);
+    
+    //Send Delayed Message Command
     send_message_delay(bus, ctrl, &delay_time, 1);
+    
     //Go into recieve mode - Wait for Message
-    debug_print("Sent message, waiting for reply...\n");
+    //debug_print("Sent message, waiting for reply...\n");
     wait_for_msg_int(bus, ctrl, sta, interrupt_pin);
-    //Grab Info
-    debug_print("Got message, grabbing data...\n");
+    //We got a reply!
+    
+    //Grab RX Info
+    //debug_print("Got message, grabbing data...\n");
     struct rx_data data;
     get_rx_data(bus, &data);
-    //Get Timestamp
-    uint64_t timestamp_rx_2 = data.timestamp.rx_stamp; //Lower 40 Bits
-    //Get TX Timestamp (When it sent it's message)
-    uint64_t timestamp_tx_2 = data.buffer.timestamp_tx;
-    (void) timestamp_tx_2;
-    //Get RX Timestamp (When it got our message)
+    
+    //RX Timestamp (When we got it's reply)
+    info->timestamp_rx_2 = data.timestamp.rx_stamp; //Lower 40 Bits
+    
+    //TX Timestamp (When it sent it's message)
+    info->timestamp_tx_2 = data.buffer.timestamp_tx;
+    //Compute RX Timestamp (When it got our message)
+    info->timestamp_rx_1 = time_sub(info->timestamp_tx_2, T_REPLY);
 
     //Compute Next Send Time
-    uint64_t timestamp_tx_3 = time_add(timestamp_rx_2, T_REPLY);
+    info->timestamp_tx_3 = time_add(info->timestamp_rx_2, T_REPLY);
+    
     //Compose Response
-    debug_print("I got the response at %llu, which says the other device"
-      " sent its message at %llu, I will reply at %llu\n",
-      timestamp_rx_2,
-      timestamp_tx_2,
-      timestamp_tx_3);
-    delay_time.delay_time = timestamp_tx_3;
-    tx_buff->timestamp_tx = timestamp_tx_3;
+    delay_time.delay_time = info->timestamp_tx_3;
+    tx_buff->timestamp_tx = info->timestamp_tx_3;
+    
     //Write in new buffer
     write_spi_msg(bus, buff_rx, tx_buff, TX_BUFFER_LEN);
+    
     //Send Message
     send_message_delay(bus, ctrl, &delay_time, 0);
-    debug_print("Message will be sent, I am done\n");
+    //debug_print("Message will be sent, I am done\n");
+    
     //TODO: Propogation Logic
+    /*
     uint64_t t_round1 = time_sub(timestamp_rx_2, timestamp_tx_1);
     uint64_t t_prop = (t_round1 - T_REPLY) / 2;
     printf("I compute a tProp of %llu clock cycles\n", t_prop);
     double prop_in_secs = ((double) t_prop) / ((double) CLOCK_FREQ);
     printf("So the distance is %f meters", prop_in_secs * LIGHT_SPEED);
+    */
   }
 
   void ranging_recv(struct spi_bus * bus, struct system_control *ctrl,
-    struct system_status *sta, struct tx_buffer *tx_buff, int interrupt_pin) {
+    struct system_status *sta, struct tx_buffer *tx_buff, 
+    struct range_info *info, int interrupt_pin) {
    //Go into recieve moce - Wait for Message
-   debug_print("Ok, waiting for first message...\n");
+   //debug_print("Ok, waiting for first message...\n");
    wait_for_msg_int(bus, ctrl, sta, interrupt_pin);
-   debug_print("Got First Message, grabbing data...\n");
+   //debug_print("Got First Message, grabbing data...\n");
+   
    //Grab Info
    struct rx_data data;
    get_rx_data(bus, &data);
    //Get Timestamp
-   uint64_t timestamp_rx_1 = data.timestamp.rx_stamp; //Lower 40 Bits
+   info->timestamp_rx_1 = data.timestamp.rx_stamp; //Lower 40 Bits
    //Get TX Timestamp
-   uint64_t timestamp_tx_1 = data.buffer.timestamp_tx;
- //Compute Next Send Time
- uint64_t timestamp_tx_2 = time_add(timestamp_rx_1, T_REPLY);
- debug_print("Ok, got message at timestamp %llu, which was sent at"
- " %llu, will send at %llu\n",
-  timestamp_rx_1, timestamp_tx_1, timestamp_rx_2);
- //Compose Response
- struct dx_time delay_time; 
- delay_time.reg = DX_TIME_REG | WRITE;
- delay_time.delay_time = timestamp_tx_2;
- tx_buff->timestamp_tx = timestamp_tx_2;
- //Write in new buffer
- char buff_rx[TX_BUFFER_LEN];
- write_spi_msg(bus, buff_rx, tx_buff, TX_BUFFER_LEN);
- //Send Message
- send_message_delay(bus, ctrl, &delay_time, 1);
- debug_print("Sending packet containing send time %llu"
-  " at time %llu, now waiting for response\n",
-  timestamp_tx_2,
-  timestamp_tx_2);
- //Wait for Response
- wait_for_msg_int(bus, ctrl, sta, interrupt_pin);
- //Grab Info
- debug_print("Got third message, grabbing data...\n");
- struct rx_data data2;
- get_rx_data(bus, &data2);
- //Get Timestamp
- uint64_t timestamp_rx_3 = data2.timestamp.rx_stamp; //Lower 40 Bits
- //Get TX Timestamp
- uint64_t timestamp_tx_3 = data2.buffer.timestamp_tx;
- debug_print("The other device sent it's message at %llu,"
-  " I received its message at %llu\n",
-  timestamp_tx_3,
-  timestamp_rx_3);
- debug_print("I am done\n");
- //TODO: Propogation Logic
- uint64_t timestamp_rx_2 = time_sub(timestamp_tx_3,T_REPLY);
- uint64_t t_round1 = time_sub(timestamp_rx_2, timestamp_tx_1);
- uint64_t t_round2 = time_sub(timestamp_rx_3, timestamp_tx_2);
- printf("The other device will compute tprop of %llu\n", (t_round1 - T_REPLY) / 2);
- double t_prop = ((double)t_round1 * (double)t_round2 - (double)T_REPLY*(double)T_REPLY) / ((double)t_round1 + (double)t_round2 + (double)T_REPLY + (double)T_REPLY);
- printf("I compute a tprop of %f clock cycles\n",t_prop);
- double prop_in_secs = ((double) t_prop) / ((double) CLOCK_FREQ);
- printf("So the distance is %f meters", prop_in_secs * LIGHT_SPEED);
+   info->timestamp_tx_1 = data.buffer.timestamp_tx;
+ 
+   //Compute Next Send Time
+   info->timestamp_tx_2 = time_add(info->timestamp_rx_1, T_REPLY);
+   //debug_print("Ok, got message at timestamp %llu, which was sent at"
+   //" %llu, will send at %llu\n",
+   // timestamp_rx_1, timestamp_tx_1, timestamp_rx_2);
+   
+   //Compose Response
+   struct dx_time delay_time; 
+   delay_time.reg = DX_TIME_REG | WRITE;
+   delay_time.delay_time = info->timestamp_tx_2;
+   tx_buff->timestamp_tx = info->timestamp_tx_2;
+   
+   //Write in new buffer
+   char buff_rx[TX_BUFFER_LEN];
+   write_spi_msg(bus, buff_rx, tx_buff, TX_BUFFER_LEN);
+   
+   //Send Message
+   send_message_delay(bus, ctrl, &delay_time, 1);
+   //debug_print("Sending packet containing send time %llu"
+   //" at time %llu, now waiting for response\n",
+   //timestamp_tx_2,
+   //timestamp_tx_2);
+
+  //Wait for Response
+  wait_for_msg_int(bus, ctrl, sta, interrupt_pin);
+ 
+  //Grab Info
+  debug_print("Got third message, grabbing data...\n");
+  struct rx_data data2;
+  get_rx_data(bus, &data2);
+  //Get Timestamp
+  info->timestamp_rx_3 = data2.timestamp.rx_stamp; //Lower 40 Bits
+  //Get TX Timestamp
+  info->timestamp_tx_3 = data2.buffer.timestamp_tx;
+  info->timestamp_rx_2 = time_sub(info->timestamp_tx_2, T_REPLY);
+  //debug_print("The other device sent it's message at %llu,"
+  //" I received its message at %llu\n",
+  //timestamp_tx_3,
+  //timestamp_rx_3);
+  debug_print("I am done\n");
+  //TODO: Propogation Logic
+  /*
+  uint64_t timestamp_rx_2 = time_sub(timestamp_tx_3,T_REPLY);
+  uint64_t t_round1 = time_sub(timestamp_rx_2, timestamp_tx_1);
+  uint64_t t_round2 = time_sub(timestamp_rx_3, timestamp_tx_2);
+  printf("The other device will compute tprop of %llu\n", (t_round1 - T_REPLY) / 2);
+  double t_prop = ((double)t_round1 * (double)t_round2 - (double)T_REPLY*(double)T_REPLY) / ((double)t_round1 + (double)t_round2 + (double)T_REPLY + (double)T_REPLY);
+  printf("I compute a tprop of %f clock cycles\n",t_prop);
+  double prop_in_secs = ((double) t_prop) / ((double) CLOCK_FREQ);
+  printf("So the distance is %f meters", prop_in_secs * LIGHT_SPEED);
+  */
 }
 
 uint64_t time_add(uint64_t curr_time, uint64_t delay_time) {
