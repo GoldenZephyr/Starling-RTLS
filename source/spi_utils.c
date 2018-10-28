@@ -202,7 +202,7 @@
 
     struct timespec slptime;
     slptime.tv_sec = 0;
-    slptime.tv_nsec = 10000;
+    slptime.tv_nsec = 5000;
     
     //Turn on receiver
     sys_ctrl_init(ctrl); 
@@ -605,4 +605,12 @@ void clear_status(struct spi_bus *bus, struct system_status *sta) {
   sta->res_2 = 0;
   unsigned char rx_buf[SYS_STATUS_LEN];
   write_spi_msg(bus, rx_buf, sta, SYS_STATUS_LEN);
+}
+
+void reset_trx(struct spi_bus *bus, struct system_control *ctrl) {
+  sys_ctrl_init(ctrl);
+  char ctrl_rx[SYS_CTRL_LEN] = {0x00};
+  ctrl->trxoff = 0x01;
+  write_spi_msg(bus, &ctrl_rx, ctrl, SYS_CTRL_LEN);
+  ctrl->trxoff = 0x00;
 }

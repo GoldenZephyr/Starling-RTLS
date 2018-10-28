@@ -93,42 +93,56 @@ int main() {
   */
   int interrupt_pin = 0;
 
-  //Determine Mode
-  printf("Mode: 1 for initial sender | 0 for receiver\n");
-  ret = fgets((char *) &tx_buff.payload, sizeof(tx_buff.payload), stdin);
-  if (ret == NULL) {
-    printf("Error reading tx_buff.payload or no value entered\n");
-    exit(EXIT_FAILURE);
-  }
-  //Interrupt Check
-  /*if (wiringPiISR(3, INT_EDGE_RISING, test_interrupt) < 0){
-    perror("Error setting up ISR");
-  }
-  while (interrupt_test == 0) {}
-  printf("Got Interrupt\n");
-  return 0; */
   
   //Load microcode
   load_microcode(&bus0);
   //Interrupt Mask
   struct system_mask mask;
   sys_mask_init(&bus0, &mask);
-
-  struct range_info info;
-  memset(&info, 0x00, sizeof(struct range_info));
-  //Check Mode
-  if (tx_buff.payload[0] == '0') {
-    printf("Waiting for msg...\n");
-    ranging_recv(&bus0, &sys_ctrl, &sta, &tx_buff, &info, interrupt_pin);
-    //Propogation Logic
-    uint64_t t_round1 = time_sub(info.timestamp_rx_2, info.timestamp_tx_1);
-    uint64_t t_round2 = time_sub(info.timestamp_rx_3, info.timestamp_tx_2);
-    double t_prop = ((double)t_round1 * (double)t_round2 - (double)T_REPLY*(double)T_REPLY) / ((double)t_round1 + (double)t_round2 + (double)T_REPLY + (double)T_REPLY);
-    printf("I compute a tprop of %f clock cycles\n", t_prop);
-    double prop_in_secs = ((double) t_prop) / ((double) CLOCK_FREQ);
-    printf("So the distance is %f meters", prop_in_secs * LIGHT_SPEED);
-  } else if (tx_buff.payload[0] == '1') { //Transmit Message
-    ranging_send(&bus0, &sys_ctrl, &sta, &tx_buff, &info, interrupt_pin);
+  
+  while(1) {
+   //Determine Mode
+   printf("Mode: 1 for initial sender | 0 for receiver\n");
+   ret = fgets((char *) &tx_buff.payload, sizeof(tx_buff.payload), stdin);
+   if (ret == NULL) {
+     printf("Error reading tx_buff.payload or no value entered\n");
+     exit(EXIT_FAILURE);
+   }
+   //Interrupt Check
+   /*if (wiringPiISR(3, INT_EDGE_RISING, test_interrupt) < 0){
+     perror("Error setting up ISR");
+   }
+   while (interrupt_test == 0) {}
+   printf("Got Interrupt\n");
+   return 0; */
+   
+  
+   struct range_info info;
+   memset(&info, 0x00, sizeof(struct range_info));
+   //Check Mode
+   if (tx_buff.payload[0] == '0') {
+     printf("Waiting for msg...\n");
+     reset_trx(&bus0, &sys_ctrl);
+     ranging_recv(&bus0, &sys_ctrl, &sta, &tx_buff, &info, interrupt_pin);
+     //Propogation Logic
+     uint64_t t_round1 = time_sub(info.timestamp_rx_2, info.timestamp_tx_1);
+     uint64_t t_round2 = time_sub(info.timestamp_rx_3, info.timestamp_tx_2);
+     double t_prop = ((double)t_round1 * (double)t_round2 - (double)T_REPLY*(double)T_REPLY) / ((double)t_round1 + (double)t_round2 + (double)T_REPLY + (double)T_REPLY);
+     printf("I compute a tprop of %f clock cycles\n", t_prop);
+     double prop_in_secs = ((double) t_prop) / ((double) CLOCK_FREQ);
+     printf("So the distance is %f meters", prop_in_secs * LIGHT_SPEED);
+   } else if (tx_buff.payload[0] == '1') { //Transmit Message
+     reset_trx(&bus0, &sys_ctrl);
+     ranging_send(&bus0, &sys_ctrl, &sta, &tx_buff, &info, interrupt_pin); 
+     uint64_t t_round1 = time_sub(info.timestamp_rx_2, info.timestamp_tx_1);
+     uint64_t t_prop = (t_round1 - T_REPLY) / 2;
+     printf("I compute a tProp of %llu clock cycles\n", t_prop);
+     double prop_in_secs = ((double) t_prop) / ((double) CLOCK_FREQ);
+     printf("So the distance is %f meters", prop_in_secs * LIGHT_SPEED);
   }
-  return 0;
+  reset_trx(&bus0, &sys_ctrl);
+ }
+ return 0;
+
+
 }

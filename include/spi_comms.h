@@ -380,6 +380,6 @@ int write_payload(struct spi_bus *bus,
               const int len,
               const uint64_t timestamp);
 
-
+void reset_trx(struct spi_bus *bus, struct system_control *ctrl);
 
 
