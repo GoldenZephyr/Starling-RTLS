@@ -422,7 +422,9 @@
     //Compose Response
     delay_time.delay_time = timestamp_tx_3;
     tx_buff->timestamp_tx = timestamp_tx_3;
-    
+    tx_buff->fp_ampl1 = data.timestamp.fp_ampl1;
+    tx_buff->rxpacc_rx = data.finfo.rxpacc;
+    tx_buff->fqual = data.fqual;
     //Write in new buffer
     write_spi_msg(bus, buff_rx, tx_buff, TX_BUFFER_LEN);
     
@@ -458,7 +460,6 @@
    info->timestamp_rx_1 = data.timestamp.rx_stamp; //Lower 40 Bits
    //Get TX Timestamp
    info->timestamp_tx_1 = data.buffer.timestamp_tx;
- 
    //Compute Next Send Time
    info->timestamp_tx_2 = time_add(info->timestamp_rx_1, T_REPLY);
    //debug_print("Ok, got message at timestamp %llu, which was sent at"
@@ -470,20 +471,25 @@
    delay_time.reg = DX_TIME_REG | WRITE;
    delay_time.delay_time = info->timestamp_tx_2;
    tx_buff->timestamp_tx = info->timestamp_tx_2;
-   
+   tx_buff->fp_ampl1 = data.timestamp.fp_ampl1;
+   tx_buff->rxpaxx_rx = data.finfo.rxpaxx;
+   tx_buff->fqual = data.fqual;
+
    //Write in new buffer
    char buff_rx[TX_BUFFER_LEN];
    write_spi_msg(bus, buff_rx, tx_buff, TX_BUFFER_LEN);
    
    //Send Message
    send_message_delay(bus, ctrl, &delay_time, 1);
-   //debug_print("Sending packet containing send time %llu"
-   //" at time %llu, now waiting for response\n",
-   //timestamp_tx_2,
-   //timestamp_tx_2);
+  
+   //Store RX info
+   info->rx_fqual_1 = data.fqual;
+   info->rxpacc_rx_1 = data.finfo.rxpacc;
+   info->fp_ampl1_rx_1 = data.timestamp.fp_ampl1;
 
-  //Wait for Response
-  wait_for_msg_int(bus, ctrl, sta, interrupt_pin);
+
+   //Wait for Response
+   wait_for_msg_int(bus, ctrl, sta, interrupt_pin);
  
   //Grab Info
   debug_print("Got third message, grabbing data...\n");
@@ -494,10 +500,16 @@
   //Get TX Timestamp
   info->timestamp_tx_3 = data2.buffer.timestamp_tx;
   info->timestamp_rx_2 = time_sub(info->timestamp_tx_3, T_REPLY);
-  //debug_print("The other device sent it's message at %llu,"
-  //" I received its message at %llu\n",
-  //timestamp_tx_3,
-  //timestamp_rx_3);
+  
+  //Store RX info
+  info->rx_fqual_2 = data2.buffer.fqual;
+  info->rx_fpampl1_rx_2 = data2.buffer.fp_ampl1;
+  info->rxpacc_rx_2 = data2.buffer.rxpacc_rx;
+  
+  info->rx_fqual_3 = data2.fqual;
+  info->rxpacc_rx_3 = data2.finfo.rxpacc;
+  info->fp_ampl1_rx_3 = data2.timestamp.fp_ampl1;
+  
   debug_print("I am done\n");
   //TODO: Propogation Logic
   /*
@@ -553,6 +565,7 @@ int get_rx_data(struct spi_bus *bus, struct rx_data *data) {
   data->finfo.reg = RX_FINFO_REG;
   data->timestamp.reg = RX_TIME_REG;
   data->buffer.reg = RX_BUFFER_REG;
+  data->fqual.reg = RX_FQUAL_REG;
   //Initalize TX Messages
   char tx_finfo[RX_FINFO_LEN] = {0x00};
   tx_finfo[0] = RX_FINFO_REG;
@@ -560,10 +573,13 @@ int get_rx_data(struct spi_bus *bus, struct rx_data *data) {
   tx_timestamp[0] = RX_TIME_REG;
   char tx_buffer[TX_BUFFER_LEN] = {0x00};
   tx_buffer[0] = RX_BUFFER_REG;
+  char tx_fqual[RX_FQUAL_LEN] = {0x00};
+  tx_fqual[0] = RX_FQUAL_REG;
   //Write Data Into Structs
   write_spi_msg(bus, &(data->finfo), tx_finfo, RX_FINFO_LEN);
   write_spi_msg(bus, &(data->timestamp), tx_timestamp, RX_TIME_LEN);
   write_spi_msg(bus, &(data->buffer), tx_buffer, RX_BUFFER_LEN);
+  write_spi_msg(bus, &(data->fqual), tx_fqual, RX_FQUAL_LEN);
   return 0;
 }
 

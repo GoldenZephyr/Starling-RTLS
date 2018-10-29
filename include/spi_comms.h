@@ -56,6 +56,9 @@
 #define EC_CTRL_REG 0x24
 #define EC_CTRL_LEN 5
 
+#define RX_FQUAL_REG 0x12
+#define RX_FQUAL_LEN 9
+
 #define LIGHT_SPEED 299792458
 #define CLOCK_FREQ 128*499200000
 #define T_REPLY (uint64_t) CLOCK_FREQ/200 //5 ms
@@ -116,6 +119,9 @@ struct __attribute__((__packed__)) tx_buffer {
   uint8_t reg;
   struct mac_header mac_header;
   uint64_t timestamp_tx : 40;
+  uint16_t fp_ampl1;
+  uint16_t rxpacc_rx;
+  struct rx_fqual fqual;
   uint8_t payload[PAYLOAD_LEN]; //TODO: Longer? 64 Bytes
 };
 
@@ -270,14 +276,27 @@ struct __attribute__((__packed__)) rx_buffer { //Yeah it's tx_buffer...
   uint8_t reg;
   struct mac_header mac_header;
   uint64_t timestamp_tx : 40;
+  uint16_t fp_ampl1;
+  uint16_t rxpacc_rx;
+  struct rx_fqual fqual;
   uint8_t payload[PAYLOAD_LEN];
+};
+
+
+struct __attribute__((__packed__)) rx_fqual {
+  uint16_t std_noise;
+  uint16_t fp_ampl2;
+  uint16_t pp_ampl3;
+  uint16_t cir_pwr;
 };
 
 //Wrapper Struct - Has all transmission RX information
 struct __attribute__((__packed__)) rx_data {
+  uint8_t reg;
   struct rx_finfo finfo;
   struct rx_time timestamp;
   struct rx_buffer buffer;
+  struct rx_fqual fqual;
 };
 
 struct __attribute__((__packed__)) dx_time {
@@ -297,6 +316,15 @@ struct __attribute__((__packed__)) range_info {
   uint64_t timestamp_rx_2 : 40;
   uint64_t timestamp_tx_3 : 40;
   uint64_t timestamp_rx_3 : 40;
+  uint16_t fp_ampl1_rx_1;
+  uint16_t fp_ampl1_rx_2;
+  uint16_t fp_ampl1_rx_3;
+  uint16_t rxpacc_rx_1;
+  uint16_t rxpacc_rx_2;
+  uint16_t rxpacc_rx_3;
+  struct rx_fqual rx_fqual_1;
+  struct rx_fqual rx_fqual_2;
+  struct rx_fqual rx_fqual_3;
 };
 
 struct __attribute__((__packed__)) ec_ctrl {
