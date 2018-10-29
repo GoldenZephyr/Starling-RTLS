@@ -128,7 +128,6 @@ int main() {
    if (tx_buff.payload[0] == '0') {
      slptime.tv_nsec = 100000000; //0.1 sec
      while (1) {
-     printf("Waiting for msg...\n");
      ranging_recv(&bus0, &sys_ctrl, &sta, &tx_buff, &info, interrupt_pin);
      //Propogation Logic
      /*
@@ -139,7 +138,7 @@ int main() {
      double prop_in_secs = ((double) t_prop) / ((double) CLOCK_FREQ);
      printf("So the distance is %f meters\n", prop_in_secs * LIGHT_SPEED);
      */
-     printf("%llu, %llu, %llu, %llu, %llu, %llu, %d, %d, %d, %d, %u, %u, %u %u %u %u %u %u %u %u %u %u %u %u\n",
+     printf("%llu, %llu, %llu, %llu, %llu, %llu, %d, %d, %d, %d, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u, %u\n",
      (uint64_t) info.timestamp_tx_1, (uint64_t) info.timestamp_rx_1,
      (uint64_t) info.timestamp_tx_2, (uint64_t) info.timestamp_rx_2,
      (uint64_t) info.timestamp_tx_3, (uint64_t) info.timestamp_rx_3,
@@ -148,17 +147,19 @@ int main() {
      info.rx_fqual_1.std_noise, info.rx_fqual_1.fp_ampl2, info.rx_fqual_1.pp_ampl3, info.rx_fqual_1.cir_pwr,
      info.rx_fqual_2.std_noise, info.rx_fqual_2.fp_ampl2, info.rx_fqual_2.pp_ampl3, info.rx_fqual_2.cir_pwr,
      info.rx_fqual_3.std_noise, info.rx_fqual_3.fp_ampl2, info.rx_fqual_3.pp_ampl3, info.rx_fqual_3.cir_pwr);
+     fflush(stdout);
      nanosleep(&slptime, NULL);
      }
    } else if (tx_buff.payload[0] == '1') { //Transmit Message
      while (1) {
-     ranging_send(&bus0, &sys_ctrl, &sta, &tx_buff, &info, interrupt_pin); 
-     uint64_t t_round1 = time_sub(info.timestamp_rx_2, info.timestamp_tx_1);
-     uint64_t t_prop = (t_round1 - T_REPLY) / 2;
-     printf("I compute a tProp of %llu clock cycles\n", t_prop);
-     double prop_in_secs = ((double) t_prop) / ((double) CLOCK_FREQ);
-     printf("So the distance is %f meters\n", prop_in_secs * LIGHT_SPEED);
-     nanosleep(&slptime, NULL);
+      ranging_send(&bus0, &sys_ctrl, &sta, &tx_buff, &info, interrupt_pin); 
+      return 0;
+      uint64_t t_round1 = time_sub(info.timestamp_rx_2, info.timestamp_tx_1);
+      uint64_t t_prop = (t_round1 - T_REPLY) / 2;
+      printf("I compute a tProp of %llu clock cycles\n", t_prop);
+      double prop_in_secs = ((double) t_prop) / ((double) CLOCK_FREQ);
+      printf("So the distance is %f meters\n", prop_in_secs * LIGHT_SPEED);
+      nanosleep(&slptime, NULL);
      }
   }
  }
