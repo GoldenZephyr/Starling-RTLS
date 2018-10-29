@@ -61,7 +61,7 @@
 
 #define LIGHT_SPEED 299792458
 #define CLOCK_FREQ 128*499200000
-#define T_REPLY (uint64_t) CLOCK_FREQ/200 //5 ms
+#define T_REPLY (uint64_t) CLOCK_FREQ/100 //10 ms
 
 struct spi_bus {
   const char *interface_name;

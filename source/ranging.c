@@ -126,10 +126,9 @@ int main() {
    memset(&info, 0x00, sizeof(struct range_info));
    //Check Mode
    if (tx_buff.payload[0] == '0') {
-     slptime.tv_nsec = 100000000; //0.5 sec
+     slptime.tv_nsec = 100000000; //0.1 sec
      while (1) {
      printf("Waiting for msg...\n");
-     reset_trx(&bus0, &sys_ctrl);
      ranging_recv(&bus0, &sys_ctrl, &sta, &tx_buff, &info, interrupt_pin);
      //Propogation Logic
      /*
@@ -153,7 +152,6 @@ int main() {
      }
    } else if (tx_buff.payload[0] == '1') { //Transmit Message
      while (1) {
-     reset_trx(&bus0, &sys_ctrl);
      ranging_send(&bus0, &sys_ctrl, &sta, &tx_buff, &info, interrupt_pin); 
      uint64_t t_round1 = time_sub(info.timestamp_rx_2, info.timestamp_tx_1);
      uint64_t t_prop = (t_round1 - T_REPLY) / 2;
