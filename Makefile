@@ -1,7 +1,7 @@
 .PHONY: all, clean
 .DEFAULT_GOAL := normal
 CC = gcc
-CCFLAGS = -Wall -Werror -Wextra -pedantic -O3 -std=gnu99
+CCFLAGS = -Wall -Werror -Wextra -pedantic -O2 -std=gnu99
 INCLUDE = include
 INC_WIRINGPI = wiringPi
 DEBUG = DEBUG
