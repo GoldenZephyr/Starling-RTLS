@@ -42,7 +42,7 @@ int main() {
   }
 
   struct spi_ioc_transfer xfer0;
-//  struct system_conf sys_conf;
+  //  struct system_conf sys_conf;
   struct system_control sys_ctrl;
 
   bus0.interface_name = i_name;
@@ -84,6 +84,7 @@ int main() {
   if (decawave_comms_init(&bus0, 0xFFFF, 0xFFFF, &fctrl) == 1) {
     exit(EXIT_FAILURE);
   }
+
   //Determine Interrupt Pin
   /*
      printf("Select Interrupt Pin (BCM)\n");
@@ -99,8 +100,6 @@ int main() {
   //Interrupt Mask
   struct system_mask mask;
   sys_mask_init(&bus0, &mask);
-
-
 
   reset_trx(&bus0, &sys_ctrl);
 
@@ -119,7 +118,6 @@ int main() {
        while (interrupt_test == 0) {}
        printf("Got Interrupt\n");
        return 0; */
-
 
     struct range_info info;
     memset(&info, 0x00, sizeof(struct range_info));
