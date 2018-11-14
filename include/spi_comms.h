@@ -1,3 +1,5 @@
+#pragma once
+
 // spi_comms.h -- SPI Communication
 #include <stdint.h>
 
