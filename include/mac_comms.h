@@ -1,5 +1,10 @@
 #include <stdint.h>
 
+struct deca_device {
+  uint16_t pan_id;
+  uint16_t addr_id;
+};
+/*
 struct frame_control {
  unsigned int frame_type : 3;
  unsigned int security_enabled : 1;
@@ -20,4 +25,4 @@ struct mac_header {
   uint16_t source_pan_id;
   uint16_t source_addr;
 };
-
+*/
